@@ -1,0 +1,255 @@
+@import url(/sources/vendor/css/bootstrap.min.css);
+@import url(/sources/vendor/css/tom-select.bootstrap5.min.css);
+@import url(/sources/vendor/css/all.min.css);
+@import url(/sources/vendor/css/summernote-bs5.min.css);
+@import url(/sources/vendor/css/notify.css);
+@import url(/sources/client/css/salem.css);
+
+*,::after,::before{box-sizing:border-box}
+
+main {
+    height: 100vh;
+    height: -webkit-fill-available;
+    min-height: 100vh;
+    max-height: 100vh;
+}
+
+.sidebar {
+    max-height: 100vh;
+    overflow-y: auto;
+    background-color: #3264cf77 !important;
+}
+
+.dropdown-toggle {
+    outline: 0;
+}
+
+.btn-toggle {
+    padding: .25rem .5rem;
+    font-weight: 600;
+    color: rgba(0, 0, 0, .65);
+    background-color: transparent;
+}
+
+.btn-toggle:hover,
+.btn-toggle:focus {
+    color: rgba(0, 0, 0, .85);
+    background-color: #B4A3BF5c;
+}
+
+.btn-toggle::before {
+    width: 1.25em;
+    line-height: 0;
+    content: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='rgba%280,0,0,.5%29' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 14l6-6-6-6'/%3e%3c/svg%3e");
+    transition: transform .35s ease;
+    transform-origin: .5em 50%;
+}
+
+.btn-toggle[aria-expanded="true"] {
+    color: rgba(0, 0, 0, .85);
+}
+
+.btn-toggle[aria-expanded="true"]::before {
+    transform: rotate(90deg);
+}
+
+.btn-toggle-nav a {
+    padding: .1875rem .5rem;
+    margin-top: .125rem;
+    margin-left: 1.25rem;
+}
+
+.btn-toggle-nav a:hover,
+.btn-toggle-nav a:focus {
+    background-color: #B4A3BF5c;
+}
+
+.scroll-zone{
+    min-height: 70vh;
+    max-height: 85vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+ul li a i {
+    margin: auto 5px auto 0px;
+}
+
+.sidebar-container {
+    width: -webkit-fill-available;
+    overflow: auto;
+}
+
+.img-sidebar{
+    max-width: 80%;
+}
+
+.glass {
+    border: none;
+    -webkit-backdrop-filter: blur(var(--glass-blur, 40px));
+    backdrop-filter: blur(var(--glass-blur, 40px));
+    background-color: transparent;
+    background-image: linear-gradient(135deg, rgb(255 255 255/var(--glass-opacity, 30%)) 0%, rgb(0 0 0/0%) 100%), linear-gradient(var(--glass-reflex-degree, 100deg), rgb(255 255 255/var(--glass-reflex-opacity, 10%)) 25%, rgb(0 0 0/0%) 25%);
+    box-shadow: 0 0 0 1px rgb(255 255 255/var(--glass-border-opacity, 10%)) inset, 0 0 0 2px #0000000d;
+    text-shadow: 0 1px rgb(0 0 0/var(--glass-text-shadow-opacity, 5%));
+}
+
+button i, a i {
+    margin-right: 5px;
+}
+
+.btn-primary{
+    background-color: #381D40 !important;
+    border: none;
+}
+
+.btn-primary:hover{
+    background-color: #ffcc66 !important;
+    color: rgb(32, 32, 32)
+}
+
+.form-select:focus, .form-control:focus {
+    color: #212529;
+    background-color: #fff;
+    border-color: #8d86fe91;
+    outline: 0;
+    box-shadow: 0 0 0 0.1rem rgba(13, 69, 253, 0.25);
+}
+
+div.input-group span.input-group-text i {
+    margin-right: 5px;
+}
+
+.focus .ts-control {
+    color: #212529;
+    background-color: #fff;
+    border-color: #8d86fe91;
+    outline: 0;
+    box-shadow: 0 0 0 0.1rem rgba(13, 69, 253, 0.25);
+}
+
+[data-selectable]:hover{
+    background-color: rgb(255, 201, 101);
+    color: black
+}
+
+.ts-dropdown .active {
+    background-color: rgba(13, 69, 253, 0.25);
+    color: #000000;
+}
+
+.bg-purple{
+    background-color: rgba(13, 69, 253, 0.25);
+    color: #ffffff;
+}
+
+.bg-purple-50{
+    background-color: rgba(13, 69, 253, 0.50);
+    color: #ffffff;
+}
+
+[data-tag="src"]{
+    width: fit-content;
+    height: fit-content;
+    margin: auto;
+    padding: 5px;
+}
+
+.ts-wrapper.multi .ts-control>div {
+    background: rgba(46, 18, 114, 0.658);
+    border: 0;
+    color: #ffffff;
+    cursor: pointer;
+    margin: 0 3px 3px 0;
+    padding: 3px 8px;
+}
+
+.input-group-text .fa-solid {
+    margin-right: 5px;
+}
+
+input[type="hidden"] {
+    appearance: none;
+    background-color: initial;
+    cursor: default;
+    display: none !important;
+    padding: initial;
+    border: initial;
+}
+
+.is-link{
+    cursor: pointer;
+}
+
+.swal2-html-container {
+    justify-content: inherit !important;
+    font-size: 1em !important;
+}
+
+.swal2-icon {
+    margin: 0px !important;
+    display: flex !important;
+    position: absolute !important;
+    top: -40px !important;
+    left: -40px !important;
+    background-color: white !important;
+}
+
+.selectize-control {
+    padding: 0;
+}
+.selectize-input {
+    border: none;
+}
+
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #37004f;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.is-otrs{
+    cursor: pointer;
+    color: #37004f;
+}
+
+.green-button {
+    background-color: #76c48c; /* Verde moderno */
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(254, 255, 254, 0.966); /* Sombreado */
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.green-button:hover {
+    background-color: #85efc5; /* Color más oscuro al pasar el ratón */
+    box-shadow: 0 6px 8px rgb(255, 255, 255); /* Sombreado más intenso al pasar el ratón */
+}
+
+
+.red-button {
+    background-color: #eb918e; /* Verde moderno */
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(254, 255, 254, 0.966); /* Sombreado */
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.red-button:hover {
+    background-color: #85efc5; /* Color más oscuro al pasar el ratón */
+    box-shadow: 0 6px 8px rgb(255, 255, 255); /* Sombreado más intenso al pasar el ratón */
+}
+

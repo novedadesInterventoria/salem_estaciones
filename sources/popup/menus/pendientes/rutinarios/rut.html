@@ -1,0 +1,21 @@
+<form id="downloadRut">
+    <small class="text-muted" data-tag="planContainer">¿No está el plan requerido? Sincroniza datos de Salem.
+    </small>
+    <input type="text" name="plan" readonly class="d-none" required>
+    <input type="text" name="quincena" readonly class="d-none" required>
+    <div class="row mt-3">
+        <div class="col col-auto">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fa-solid fa-filter"></i> Plan
+                </span>
+                <select name="sheet" class="form-select" required></select>
+            </div>
+        </div>
+        <div class="col col-auto">
+            <button class="btn btn-primary">
+                <i class="fa-solid fa-download"></i>Descargar
+            </button>
+        </div>
+    </div>
+</form>

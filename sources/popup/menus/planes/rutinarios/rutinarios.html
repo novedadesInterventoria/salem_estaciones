@@ -1,0 +1,30 @@
+<form id="rutinarios" autocomplete="off">
+    <small class="text-muted">La utilidad de generación de tickets está habilitada para el  
+        <code data-tag="plan" class="fw-semibold"></code>. <br>¿No es el plan requerido? Sincroniza datos de Salem.
+    </small>
+    <input type="text" class="d-none" name="index" readonly >
+    <input type="text" class="d-none" name="filtro" required readonly>
+    <div class="row mt-3">
+        <div class="col col-xl-4 col-lg-4 col-md-6 col-6 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-wrench"></i>Equipo
+                </span>
+                <select class="form-select" name="equipo" required></select>
+            </div>
+        </div>
+        <div class="col col-xl-4 col-lg-4 col-md-6 col-6 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-bug"></i>Modo
+                </span>
+                <select class="form-select" name="modo" data-action="toggle">
+                    <option value="" selected="" disabled=""></option>
+                    <option value="simple">Individual</option>
+                    <option value="bulk">Bloque</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div id="create"></div>
+</form>

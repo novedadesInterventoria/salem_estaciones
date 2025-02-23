@@ -1,0 +1,23 @@
+/*  Estilos de alertas de Swal */
+.swal2-success-circular-line-left {
+    background-color: transparent !important;
+}
+
+.swal2-success-fix {
+    background-color: transparent !important;
+}
+
+.swal2-success-circular-line-right {
+    background-color: transparent !important;
+}
+
+.swal2-html-container *,
+.swal2-html-container::after,
+.swal2-html-container::before {
+    box-sizing: border-box !important;
+}
+
+.no-margin{
+    margin: 0 !important;
+    width: 100%;
+}

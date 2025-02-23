@@ -1,0 +1,54 @@
+<form id="preferences" class="mt-3">
+    <div class="row">
+        <div class="col-12 mb-3">
+            <small class="text-muted">Panel preferido (Úselo acorde a su gestión)</small>
+            <div class="input-group">
+                <span class="input-group-text bg-warning bg-opacity-50">
+                    <i class="fa-solid fa-display"></i>Panel
+                </span>
+                <select class="form-select" name="defaultPanel" required></select>
+            </div>
+        </div>
+    </div>
+    <small class="text-muted">Mueva la ventana al lugar donde quiera que se muestre cada vez que la abra</small>
+    <div class="row mt-2">
+        <div class="col-4 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fa-solid fa-caret-left"></i>Margin X
+                </span>
+                <input type="text" class="form-control" name="positionX" required>
+            </div>
+        </div>
+        <div class="col-4 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fa-solid fa-caret-up"></i>Margin Y
+                </span>
+                <input type="text" class="form-control" name="positionY" required>
+            </div>
+        </div>
+        <div class="col-auto">
+            <button class="btn-success btn" type="button" id="setPosition">
+                <i class="fa-solid fa-square-check"></i>Set
+            </button>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" name="offDevices" type="checkbox" role="switch">
+                <label class="form-check-label">
+                    Incluir equipos fuera de operación en generación de tickets
+                </label>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col">
+            <button class="btn btn-primary">
+                <i class="fa-solid fa-user-cog"></i>Establecer
+            </button>
+        </div>
+    </div>
+</form>

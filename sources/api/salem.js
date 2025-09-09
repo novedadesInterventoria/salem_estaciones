@@ -1758,13 +1758,6 @@ var Salem = {
           message: "Genere tickets nuevos para mantenimientos preventivos.",
           middleware: { isOTRS: "", isAlive: "" },
         },
-        prevTemporales: {
-          view: "/sources/popup/menus/planes/prevTemporales/prevTemporales.html",
-          script: "/sources/popup/menus/planes/prevTemporales/prevTemporales.js",
-          title: "Mantenimiento preventivo para estaciones Temporales",
-          message: "Genere tickets nuevos para mantenimientos preventivos estaciones Temporales.",
-          middleware: { isOTRS: "", isAlive: "" },
-        },
         mttoEspeciales: {
           view: "/sources/popup/menus/planes/mttoEspeciales/mttoEspeciales.html",
           script: "/sources/popup/menus/planes/mttoEspeciales/mttoEspeciales.js",

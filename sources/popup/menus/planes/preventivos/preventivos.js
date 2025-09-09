@@ -31,18 +31,6 @@ $(() => {
             return { cmdb, create }
         })
 
-        // Validar si hay estaciones que empiecen por TEMPORAL
-        let estacionesTemporales = salemPackage.filter(u => u.cmdb.estacion.startsWith('TEMPORAL'))
-        if (estacionesTemporales.length > 0) {
-            Salem.utils.toast({ 
-                noHide: true, 
-                title: 'Estación no permitida', 
-                message: 'Diríjase al módulo de preventivos temporales para la creación de los tickets ya que por este módulo no debe dejar crear esos mttos', 
-                type: 'warning' 
-            })
-            return
-        }
-
         // Por cada paquete, crear un formulario de OTOBO. Enviar todos al tiempo y con el manejo de hilos hacer la verificación 
         // y asignación de cada uno
         let otrsCheckDuplicity = await checkDuplicity(salemPackage)

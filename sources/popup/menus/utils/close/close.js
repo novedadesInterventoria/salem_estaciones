@@ -2,7 +2,17 @@ $(async () => {
     let info = await Salem.core.runtime.getInfo()
     let idEquipo = info['ID Móvil'] || info['ID Equipo']
     let ubicacion = info.Patio || info['Estación'] || info['Ubicación Infraestructura Física y Locativa'] || info['Ubicación Punto de Personalización']
-    let falla = info['Requerimiento de Soporte Técnico'].includes('RUTINARIO') ? 'EJECUCION DE MANTENIMIENTO RUTINARIO' : 'EJECUCION DE MANTENIMIENTO PREVENTIVO'
+    
+    // Verificar si el rótulo incluye "CAMBIO DE PARTE"
+    let includesCambioParte = info.rotulo && info.rotulo.includes('CAMBIO DE PARTE')
+    
+    let falla
+    if (includesCambioParte) {
+        falla = 'ATENCION A SOLICITUD'
+    } else {
+        falla = info['Requerimiento de Soporte Técnico'].includes('RUTINARIO') ? 'EJECUCION DE MANTENIMIENTO RUTINARIO' : 'EJECUCION DE MANTENIMIENTO PREVENTIVO'
+    }
+    
     let closeParams = storage.config.otrs.CLOSE.find(u => u.servicio == info.Servicio && u.falla == falla)
 
     $('form#closeTickets [name="rotulo"]').val(info.rotulo)
@@ -23,18 +33,29 @@ $(async () => {
             let asunto = `RESUELTO ${data.hora}`
             let completeForm = Salem.otrs.utils.predef.close.estaciones(closeForm, { ...data, firma: storage.login.firma, asunto, atencion: 'PRESENCIAL' }, closeParams)
             
-            // Enviar el cierre
-            await Salem.otrs.ajax(completeForm)
-            let middleware = await Salem.otrs.middleware({isState: 'RESUELTO'})
-            if(middleware){
-                await Salem.utils.loading({title: 'Validando por aseguramiento', message: 'Se está cambiando al estado VALIDADO POR ASEGURAMIENTO.'})
-                completeForm.NewStateID = '42' // VALIDADO POR ASEGURAMIENTO
-                completeForm.Subject = 'VALIDADO POR ASEGURAMIENTO' // VALIDADO POR ASEGURAMIENTO
-                completeForm.Body = 'VALIDADO POR ASEGURAMIENTO' // VALIDADO POR ASEGURAMIENTO
-                delete completeForm.IsVisibleForCustomer
+            if (data.falla === 'ATENCION A SOLICITUD') {
+                // Para ATENCION A SOLICITUD, usar NewStateID 33 directamente
+                completeForm.NewStateID = '33'
                 await Salem.otrs.ajax(completeForm)
-                await Salem.core.runtime.reload()
-                window.close()
+                let middleware = await Salem.otrs.middleware({isState: 'RESUELTO'})
+                if(middleware){
+                    await Salem.core.runtime.reload()
+                    window.close()
+                }
+            } else {
+                // Lógica original para otros casos (RUTINARIO y PREVENTIVO)
+                await Salem.otrs.ajax(completeForm)
+                let middleware = await Salem.otrs.middleware({isState: 'RESUELTO'})
+                if(middleware){
+                    await Salem.utils.loading({title: 'Validando por aseguramiento', message: 'Se está cambiando al estado VALIDADO POR ASEGURAMIENTO.'})
+                    completeForm.NewStateID = '42' // VALIDADO POR ASEGURAMIENTO
+                    completeForm.Subject = 'VALIDADO POR ASEGURAMIENTO'
+                    completeForm.Body = 'VALIDADO POR ASEGURAMIENTO'
+                    delete completeForm.IsVisibleForCustomer
+                    await Salem.otrs.ajax(completeForm)
+                    await Salem.core.runtime.reload()
+                    window.close()
+                }
             }
         }
         else {

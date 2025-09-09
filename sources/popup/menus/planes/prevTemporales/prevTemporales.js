@@ -1,12 +1,12 @@
 editorPanel = null
 $(() => {
-    $('#preventivos [name="modo"]').change(toggleCreateMode)
+    $('#prevTemporales [name="modo"]').change(toggleCreateMode)
     function toggleCreateMode() {
         let mode = $(this).val()
         Salem.utils.partials.injectScript(`/sources/popup/menus/planes/create/${mode}.js`)
     }
 
-    $('#preventivos').submit(async e => {
+    $('#prevTemporales').submit(async e => {
         e.preventDefault()
         let data = Salem.utils.getFormValues(e)
         if (data.progresar && data.progresar == 'SI') {
@@ -21,26 +21,31 @@ $(() => {
             data.destino = 'ASIGNADO A CAMPO'
             data.nota = null
         }
-        
-        // Resolver los datos de creación para cada ticket.
+
+        // Resolver los datos de creación para cada ticket, filtrando solo estaciones temporales
         let salemPackage = JSON.parse(data.index).map(index => {
             let cmdb = storage.config.otrs.CMDB.find(u => u.index == index)
+
+            // Filtrar solo estaciones que empiecen con "TEMPORAL"
+            if (!cmdb.estacion.startsWith('TEMPORAL')) {
+                return null; // Retornar null para filtrar después
+            }
+
             cmdb.asunto = `${data.asunto} ${cmdb.equipo} ${cmdb.name} ${cmdb.estacion} ${cmdb.ubicacion}`
             cmdb.cuerpo = cmdb.asunto
             let create = storage.config.otrs.CREATE.find(u => u.equipo == cmdb.equipo && u.requerimiento == 'MANTENIMIENTO PREVENTIVO PROGRAMADO' && u.servicio.includes('ESTACION TRONCAL'))
             return { cmdb, create }
-        })
+        }).filter(item => item !== null) // Filtrar los elementos null
 
-        // Validar si hay estaciones que empiecen por TEMPORAL
-        let estacionesTemporales = salemPackage.filter(u => u.cmdb.estacion.startsWith('TEMPORAL'))
-        if (estacionesTemporales.length > 0) {
-            Salem.utils.toast({ 
-                noHide: true, 
-                title: 'Estación no permitida', 
-                message: 'Diríjase al módulo de preventivos temporales para la creación de los tickets ya que por este módulo no debe dejar crear esos mttos', 
-                type: 'warning' 
+        // Verificar si quedaron elementos válidos para procesar
+        if (salemPackage.length === 0) {
+            Salem.utils.toast({
+                noHide: true,
+                title: 'Sin estaciones temporales',
+                message: 'No se encontraron estaciones temporales para procesar. Solo se procesan estaciones que empiecen con "TEMPORAL".',
+                type: 'error'
             })
-            return
+            return; // Salir de la función
         }
 
         // Por cada paquete, crear un formulario de OTOBO. Enviar todos al tiempo y con el manejo de hilos hacer la verificación 
@@ -156,14 +161,13 @@ $(() => {
                 Salem.core.runtime.zoomTicket(ticket)
             }
 
-            if(generados.length == otrsCheckDuplicity.length) window.close()
+            if (generados.length == otrsCheckDuplicity.length) window.close()
         })
     })
 
     $('[name="plan"]').on('change', changePrevType)
 })
 
-// Función para cargar automáticamente el plan contractual
 function loadContractualPlan() {
     const planesActive = storage.config.planes.active;
     

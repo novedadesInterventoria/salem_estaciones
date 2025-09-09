@@ -1,4 +1,4 @@
-<form id="preventivos" autocomplete="off">
+<form id="prevTemporales" autocomplete="off">
     <input type="text" class="d-none" name="index" readonly >
     <input type="text" class="d-none" name="asunto" readonly >
     <small class="text-muted d-none" data-tag="planContainer">La utilidad de generación de tickets será habilitada para el  
@@ -11,7 +11,7 @@
                     <i class="fas fa-filter"></i>Tipo
                 </span>
                 <select class="form-select" name="plan" required>
-                    <option value="contractual">PLAN MTTO PREVENTIVO</option>
+                    <option value="contractual" selected>PLAN MTTO PREVENTIVO TEMPORAL</option>
                 </select>
             </div>
         </div>
@@ -22,8 +22,8 @@
                 </span>
                 <select class="form-select" name="modo" data-action="toggle">
                     <option value="" selected="" disabled=""></option>
-                    <option value="simple">Individual</option>
-                    <option value="bulk">Bloque</option>
+                    <option value="simpleTemporal">Individual</option>
+                    <option value="bulkTemporal">Bloque</option>
                 </select>
             </div>
         </div>

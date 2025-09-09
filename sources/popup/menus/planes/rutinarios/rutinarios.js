@@ -117,7 +117,7 @@ $(() => {
                     await Salem.utils.loading({ title: 'Realizando traza', message: 'Realizando traza de estados' })
                     let sweep = await Salem.core.runtime.sweepCreate(nuevoTicket, { firma: storage.login.firma, ...data })
                     if (sweep) {
-                        await Salem.otrs.utils.move(nuevoTicket, 'MANTENIMIENTO PREVENTIVO')
+                        await Salem.otrs.utils.move(nuevoTicket, 'RUTINARIOS ESTACIONES')
 
                         let otoboUrl = `https://helpdesk.rbsas.co/otobo/index.pl?Action=AgentTicketNote;TicketID=${nuevoTicket.id}`;
                         window.open(otoboUrl, "otoboWindow", "popup,width=1200,height=1200");

@@ -836,7 +836,7 @@ var Salem = {
           });
       },
 
-      ////Traza de estados /////
+      ////Traza de estados Preventivos y rutinarios normales/////
 
       sweep: (info, params) => {
         return new Promise(async (resolve) => {
@@ -850,6 +850,85 @@ var Salem = {
             ? "buses"
             : "no_buses";
           let jumps = storage.config.sweep[cat].arbol_estados[info.Estado];
+          let form = await Salem.otrs.ajax({
+            type: "GET",
+            transform: "form",
+            Action: "AgentTicketNote",
+            TicketID: info.id,
+          });
+
+          // Controlar el tcampo si el servicio es DCA, se reciben 2 dígitos y se debe concatenar 'AUXILIARDCA'
+          // Si hay tcampo y es de dos dígitos y el servicio incluye DCA
+          if (
+            params.tcampo &&
+            params.tcampo.length <= 2 &&
+            info.Servicio.includes("DCA")
+          )
+            params.tcampo = `AUXILIARDCA${parseInt(params.tcampo)}`;
+          if (params.hora == "") params.hora = moment().format("HH:mm");
+
+          for (let i in jumps.cross) {
+            await Salem.utils.loading({
+              title: "Enviando nota",
+              message: `Se está realizando el envío de nota para estado ${jumps.cross[i]}`,
+            });
+            let nota = storage.config.sweep[cat].notas[jumps.cross[i]];
+            form.Body =
+              params.nota && jumps.cross[i] == params.destino
+                ? params.nota
+                : params.tcampo
+                  ? nota.texto.replaceAll("$tcampo", params.tcampo)
+                  : "CAMBIO DE ESTADO";
+            form.Subject = params.tcampo
+              ? nota.asunto
+                .replaceAll("$firma", storage.login.firma)
+                .replaceAll("$hora", params.hora)
+              : "CAMBIO DE ESTADO";
+            form.NewStateID = nota.status_code;
+            form.DynamicField_QUIENGESTIONA = params.tcampo
+              ? params.tcampo
+              : storage.login.firma;
+            form.DynamicField_SEGUIMIENTO = storage.login.firma;
+            form.DynamicField_INTERVENCION = "SI"; 
+
+            // Poner cambio de técnico si es que el estado actual es igual al destino.
+            form.Subject =
+              info.Estado == params.destino
+                ? `CAMBIO DE TÉCNICO`
+                : form.Subject;
+
+            // Definir si es nota externa
+            params.tcampo ? (form.IsVisibleForCustomer = "on") : null;
+
+            // Enviar info a OTOBO
+            
+            await Salem.otrs.ajax({ transform: "form", ...form });
+
+            // Cortar ejecución si el estado enviado corresponde al destino
+            if (jumps.cross[i] == params.destino) break;
+          }
+
+          //Comprobar si la traza fue exitosa
+          let result = await Salem.otrs.middleware(
+            { isState: params.destino },
+            info
+          );
+          resolve(result);
+          //params.redirect ? Salem.emit({ action: otrs.redirect }) : null
+          });
+      },
+      sweepMttoEspeciales: (info, params) => {
+        return new Promise(async (resolve) => {
+          await Salem.utils.loading({
+            title: "Enviando nota",
+            message: "Se está realizando el envío de notas",
+          });
+          //Calcular la traza de estados
+          let storage = await Salem.core.mem.get();
+          let cat = info["Categoría del Ticket"].toLowerCase().includes("flota")
+            ? "buses"
+            : "no_buses";
+          let jumps = storage.config.sweep[cat].arbol_estados["ESPECIAL_MTTO"];
           let form = await Salem.otrs.ajax({
             type: "GET",
             transform: "form",
@@ -1675,15 +1754,29 @@ var Salem = {
         preventivos: {
           view: "/sources/popup/menus/planes/preventivos/preventivos.html",
           script: "/sources/popup/menus/planes/preventivos/preventivos.js",
-          title: "<span style='color:rgb(121, 210, 143);'>Mantenimiento preventivo</span>",
-          message: "<span style='color:rgb(25, 83, 30);'>Genere tickets nuevos para mantenimientos preventivos.</span>",
+          title: "Mantenimiento preventivo",
+          message: "Genere tickets nuevos para mantenimientos preventivos.",
+          middleware: { isOTRS: "", isAlive: "" },
+        },
+        prevTemporales: {
+          view: "/sources/popup/menus/planes/prevTemporales/prevTemporales.html",
+          script: "/sources/popup/menus/planes/prevTemporales/prevTemporales.js",
+          title: "Mantenimiento preventivo para estaciones Temporales",
+          message: "Genere tickets nuevos para mantenimientos preventivos estaciones Temporales.",
+          middleware: { isOTRS: "", isAlive: "" },
+        },
+        mttoEspeciales: {
+          view: "/sources/popup/menus/planes/mttoEspeciales/mttoEspeciales.html",
+          script: "/sources/popup/menus/planes/mttoEspeciales/mttoEspeciales.js",
+          title: "Mantenimiento rutinario Especial",
+          message: "Genere tickets nuevos para mantenimientos rutinarios especiales.",
           middleware: { isOTRS: "", isAlive: "" },
         },
         rutinarios: {
           view: "/sources/popup/menus/planes/rutinarios/rutinarios.html",
           script: "/sources/popup/menus/planes/rutinarios/rutinarios.js",
-          title: "<span style='color:rgb(225, 156, 156);'>Mantenimiento rutinario</span>",
-          message: "<span style='color: #ff6666;'>Genere tickets nuevos para mantenimientos rutinarios.</span>",
+          title: "Mantenimiento rutinario",
+          message: "Genere tickets nuevos para mantenimientos rutinarios.",
           middleware: { isOTRS: "", isAlive: "" },
         },
         bulk: {
@@ -1735,7 +1828,10 @@ var Salem = {
           middleware: {
             isOTRS: "",
             isZoom: "",
-            isState: "PROGRESO MTTO PREVENTIVO",
+            isState: [
+             "PROGRESO MTTO PREVENTIVO",
+             "EN PROGRESO"
+            ]
           },
         },
       },

@@ -1,19 +1,20 @@
 $(async () => {
     let idSelector = null
-    let panel = await Salem.utils.partials.get('/sources/popup/menus/planes/create/simple.html', {})
+    let panel = await Salem.utils.partials.get('/sources/popup/menus/planes/create/simpleTemporal.html', {})
     let estaciones = []
+    
+    // Filtrar solo estaciones que empiecen con "TEMPORAL"
     storage.config.otrs.CMDB.forEach(fila => {
-        let match = estaciones.find(u => u.name == fila.estacion)
-        if (!match) estaciones.push({ name: fila.estacion })
+        if (fila.estacion.startsWith('TEMPORAL')) {
+            let match = estaciones.find(u => u.name == fila.estacion)
+            if (!match) estaciones.push({ name: fila.estacion })
+        }
     })
-
-   
-
+    
     estaciones.sort((a, b) => b.name - a.name)
     new TomSelect($(panel).find('[name="estacion"]'), {
         valueField: 'name', labelField: 'name', searchField: 'name', options: estaciones,
-        onChange: setEquipos,
-       
+        onChange: setEquipos
     })
 
     await Salem.utils.loading({ title: 'Obteniendo técnicos', message: 'Se está consultando el listado de técnicos disponibles en OTOBO.' })
@@ -28,7 +29,8 @@ $(async () => {
 
     function setEquipos() {
         let [estacion] = this.items
-        let equipos = storage.config.otrs.CMDB.filter(u => u.estacion == estacion).map(fila => {
+        // Filtrar equipos solo de estaciones temporales
+        let equipos = storage.config.otrs.CMDB.filter(u => u.estacion == estacion && u.estacion.startsWith('TEMPORAL')).map(fila => {
             return { index: fila.index, name: `${fila.equipo} ${fila.name}` }
         })
 

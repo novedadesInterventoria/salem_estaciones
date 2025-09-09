@@ -9,6 +9,9 @@ $(async () => {
         let match = estaciones.find(u => u.name == fila.estacion)
         if (!match) estaciones.push({ name: fila.estacion })
     })
+
+   
+
     estaciones.sort((a, b) => b.name - a.name)
     let estacionSelector = new TomSelect($(panel).find('[name="estacion"]'), {
         valueField: 'name', labelField: 'name', searchField: 'name', options: estaciones,

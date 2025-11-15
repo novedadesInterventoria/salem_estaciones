@@ -670,11 +670,83 @@ var Salem = {
       $(document).on("click", ".is-otrs", (e) =>
         Salem.core.runtime.zoomTicket($(e.currentTarget).text())
       );
+
+      // Iniciar actualización automática de tickets calientes
+      Salem.core.iniciarAutoActualizacionTicketsCalientes()
+      
+
+      
     },
     checkSync: async (storage) => {
       let ahora = Date.now();
       if (storage && storage.syncDate && ahora >= storage.syncDate)
         Salem.core.runtime.sync();
+    },
+
+    /**
+     * Actualiza automáticamente los tickets calientes desde OTOBO
+     * Función que actualiza automáticamente los tickets calientes cada 5 minutos
+     */
+    autoActualizarTicketsCalientes: async function () {
+      try {
+        let storage = await Salem.core.mem.get()
+        
+        // Verificar que existe la sesión y la configuración
+        if (!storage || !storage.config || !storage.config.abiertosEstaciones) {
+          console.error("Salem Flota :: Configuración no disponible")
+          return
+        }
+    
+        // Obtener configuración desde el archivo JSON externo
+        let config = storage.config.abiertosEstaciones
+    
+        // Realizar la consulta a OTOBO con el query configurado
+        let ticketsData = await Salem.otrs.ajax(config.query)
+    
+        // Mapear los datos según los headers configurados
+        let mappedData = ticketsData.map((u) => {
+          let registro = {}
+          config.headers.forEach((key) => {
+            registro[key] = u[key];
+          })
+          return registro
+        })
+    
+        // Enviar los datos al API de Google Apps Script
+        if (mappedData && mappedData.length > 0) {
+          await Salem.core.api({
+            action: "ticketsCalienteEstaciones",
+            subaction: "open",
+            data: mappedData
+          })
+        } 
+      } catch (error) {
+        console.error("Salem Flota :: Error en actualización automática de tickets calientes:", error)
+      }
+    },
+    /**
+     * Inicia la actualización automática de tickets calientes cada 5 minutos
+     */
+    iniciarAutoActualizacionTicketsCalientes: function () {
+      // Intervalo de actualización: 60 segundos (60000 ms)
+      const INTERVALO_ACTUALIZACION = 60000 // 60 segundos
+      
+ 
+      Salem.core.autoActualizarTicketsCalientes()
+      
+      // Configurar el intervalo para ejecuciones posteriores
+      if (!Salem.temp) {
+        Salem.temp = {}
+      }
+      
+      // Limpiar intervalo anterior si existe
+      if (Salem.temp.intervalTicketsCalientes) {
+        clearInterval(Salem.temp.intervalTicketsCalientes)
+      }
+      
+      Salem.temp.intervalTicketsCalientes = setInterval(() => {
+        Salem.core.autoActualizarTicketsCalientes()
+      }, INTERVALO_ACTUALIZACION)
     },
     runtime: {
       mra: async (storage, info) => {
@@ -808,6 +880,8 @@ var Salem = {
                       : "CAMBIO DE ESTADO";
                   form.NewStateID = nota.status_code;
                   form.DynamicField_SEGUIMIENTO = storage.login.firma;
+                  form.DynamicField_ = params.tcampo;
+                  form.SLAID = 11;
       
                   // Poner cambio de técnico si es que el estado actual es igual al destino.
                   form.Subject =

@@ -109,8 +109,6 @@ $(() => {
                     if (sweep) {
                         await Salem.otrs.utils.move(nuevoTicket, 'MANTENIMIENTO PREVENTIVO')
 
-                        let otoboUrl = `https://helpdesk.rbsas.co/otobo/index.pl?Action=AgentTicketNote;TicketID=${nuevoTicket.id}`;
-                        window.open(otoboUrl, "otoboWindow", "popup,width=1200,height=1200");
 
                         note.find('tbody').append(`<tr>
                             <td class="is-otrs">${nuevoTicket.ticket}</td>

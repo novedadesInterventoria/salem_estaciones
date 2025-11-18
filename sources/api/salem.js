@@ -1898,6 +1898,7 @@ var Salem = {
             isState: [
              "PROGRESO MTTO PREVENTIVO",
              "EN PROGRESO"
+
             ]
           },
         },

@@ -1,6 +1,6 @@
 {
     "name": "Salem",
-    "version": "1.2.2.9",
+    "version": "1.2.3.1",
     "manifest_version": 3,
     "description": "Salem, asistente para ayudar a optimizar la documentación de tickets de OTOBO en SOMI Estaciones.",
     "content_scripts": [

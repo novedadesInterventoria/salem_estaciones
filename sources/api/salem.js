@@ -673,9 +673,9 @@ var Salem = {
 
       // Iniciar actualización automática de tickets calientes
       Salem.core.iniciarAutoActualizacionTicketsCalientes()
-      
 
-      
+
+
     },
     checkSync: async (storage) => {
       let ahora = Date.now();
@@ -690,19 +690,19 @@ var Salem = {
     autoActualizarTicketsCalientes: async function () {
       try {
         let storage = await Salem.core.mem.get()
-        
+
         // Verificar que existe la sesión y la configuración
         if (!storage || !storage.config || !storage.config.abiertosEstaciones) {
           console.error("Salem Flota :: Configuración no disponible")
           return
         }
-    
+
         // Obtener configuración desde el archivo JSON externo
         let config = storage.config.abiertosEstaciones
-    
+
         // Realizar la consulta a OTOBO con el query configurado
         let ticketsData = await Salem.otrs.ajax(config.query)
-    
+
         // Mapear los datos según los headers configurados
         let mappedData = ticketsData.map((u) => {
           let registro = {}
@@ -711,7 +711,7 @@ var Salem = {
           })
           return registro
         })
-    
+
         // Enviar los datos al API de Google Apps Script
         if (mappedData && mappedData.length > 0) {
           await Salem.core.api({
@@ -719,7 +719,7 @@ var Salem = {
             subaction: "open",
             data: mappedData
           })
-        } 
+        }
       } catch (error) {
         console.error("Salem Flota :: Error en actualización automática de tickets calientes:", error)
       }
@@ -728,22 +728,22 @@ var Salem = {
      * Inicia la actualización automática de tickets calientes cada 5 minutos
      */
     iniciarAutoActualizacionTicketsCalientes: function () {
-      // Intervalo de actualización: 60 segundos (60000 ms)
-      const INTERVALO_ACTUALIZACION = 60000 // 60 segundos
-      
- 
+      // Intervalo de actualización: 3 minutos (180000 ms)
+      const INTERVALO_ACTUALIZACION = 180000// 3 minutos
+
+
       Salem.core.autoActualizarTicketsCalientes()
-      
+
       // Configurar el intervalo para ejecuciones posteriores
       if (!Salem.temp) {
         Salem.temp = {}
       }
-      
+
       // Limpiar intervalo anterior si existe
       if (Salem.temp.intervalTicketsCalientes) {
         clearInterval(Salem.temp.intervalTicketsCalientes)
       }
-      
+
       Salem.temp.intervalTicketsCalientes = setInterval(() => {
         Salem.core.autoActualizarTicketsCalientes()
       }, INTERVALO_ACTUALIZACION)
@@ -833,81 +833,81 @@ var Salem = {
       ////Traza creaciòn de tickets/////
 
       sweepCreate: (info, params) => {
-          return new Promise(async (resolve) => {
-              await Salem.utils.loading({
-                  title: "Enviando nota",
-                  message: "Se está realizando el envío de notas",
-              });
-              // Calcular la traza de estados
-              let storage = await Salem.core.mem.get();
-              let cat = info["Categoría del Ticket"].toLowerCase().includes("flota")
-                  ? "buses"
-                  : "no_buses";
-              let jumps = storage.config.sweep[cat].arbol_estados[info.Estado];
-              let form = await Salem.otrs.ajax({
-                  type: "GET",
-                  transform: "form",
-                  Action: "AgentTicketPriority",
-                  TicketID: info.id,
-              });
-      
-              // Controlar el tcampo si el servicio es DCA, se reciben 2 dígitos y se debe concatenar 'AUXILIARDCA'
-              // Si hay tcampo y es de dos dígitos y el servicio incluye DCA
-              if (
-                  params.tcampo &&
-                  params.tcampo.length <= 2 &&
-                  info.Servicio.includes("DCA")
-              )
-                  params.tcampo = `AUXILIARDCA${parseInt(params.tcampo)}`;
-              if (params.hora == "") params.hora = moment().format("HH:mm");
-      
-              for (let i in jumps.cross) {
-                  await Salem.utils.loading({
-                      title: "Enviando nota",
-                      message: `Se está realizando el envío de nota para estado ${jumps.cross[i]}`,
-                  });
-                  let nota = storage.config.sweep[cat].notas[jumps.cross[i]];
-                  form.Body =
-                      params.nota && jumps.cross[i] == params.destino
-                          ? params.nota
-                          : params.tcampo
-                              ? nota.texto.replaceAll("$tcampo", params.tcampo)
-                              : "CAMBIO DE ESTADO";
-                  form.Subject = params.tcampo
-                      ? nota.asunto
-                          .replaceAll("$firma", storage.login.firma)
-                          .replaceAll("$hora", params.hora)
-                      : "CAMBIO DE ESTADO";
-                  form.NewStateID = nota.status_code;
-                  form.DynamicField_SEGUIMIENTO = storage.login.firma;
-                  form.DynamicField_ = params.tcampo;
-                  form.SLAID = 11;
-      
-                  // Poner cambio de técnico si es que el estado actual es igual al destino.
-                  form.Subject =
-                      info.Estado == params.destino
-                          ? `CAMBIO DE TÉCNICO`
-                          : form.Subject;
-      
-                  // Definir si es nota externa
-                  params.tcampo ? (form.IsVisibleForCustomer = "on") : null;
-      
-                  // Enviar info a OTOBO
-                  await Salem.otrs.ajax({ transform: "form", ...form });
-      
-                  // Cortar ejecución si el estado enviado corresponde al destino
-                  if (jumps.cross[i] == params.destino) break;
-              }
-      
-              // Comprobar si la traza fue exitosa
-              let result = await Salem.otrs.middleware(
-                  { isState: params.destino },
-                  info
-              );
-              resolve(result);
-      
-            
+        return new Promise(async (resolve) => {
+          await Salem.utils.loading({
+            title: "Enviando nota",
+            message: "Se está realizando el envío de notas",
           });
+          // Calcular la traza de estados
+          let storage = await Salem.core.mem.get();
+          let cat = info["Categoría del Ticket"].toLowerCase().includes("flota")
+            ? "buses"
+            : "no_buses";
+          let jumps = storage.config.sweep[cat].arbol_estados[info.Estado];
+          let form = await Salem.otrs.ajax({
+            type: "GET",
+            transform: "form",
+            Action: "AgentTicketPriority",
+            TicketID: info.id,
+          });
+
+          // Controlar el tcampo si el servicio es DCA, se reciben 2 dígitos y se debe concatenar 'AUXILIARDCA'
+          // Si hay tcampo y es de dos dígitos y el servicio incluye DCA
+          if (
+            params.tcampo &&
+            params.tcampo.length <= 2 &&
+            info.Servicio.includes("DCA")
+          )
+            params.tcampo = `AUXILIARDCA${parseInt(params.tcampo)}`;
+          if (params.hora == "") params.hora = moment().format("HH:mm");
+
+          for (let i in jumps.cross) {
+            await Salem.utils.loading({
+              title: "Enviando nota",
+              message: `Se está realizando el envío de nota para estado ${jumps.cross[i]}`,
+            });
+            let nota = storage.config.sweep[cat].notas[jumps.cross[i]];
+            form.Body =
+              params.nota && jumps.cross[i] == params.destino
+                ? params.nota
+                : params.tcampo
+                  ? nota.texto.replaceAll("$tcampo", params.tcampo)
+                  : "CAMBIO DE ESTADO";
+            form.Subject = params.tcampo
+              ? nota.asunto
+                .replaceAll("$firma", storage.login.firma)
+                .replaceAll("$hora", params.hora)
+              : "CAMBIO DE ESTADO";
+            form.NewStateID = nota.status_code;
+            form.DynamicField_SEGUIMIENTO = storage.login.firma;
+            form.DynamicField_ = params.tcampo;
+            form.SLAID = 11;
+
+            // Poner cambio de técnico si es que el estado actual es igual al destino.
+            form.Subject =
+              info.Estado == params.destino
+                ? `CAMBIO DE TÉCNICO`
+                : form.Subject;
+
+            // Definir si es nota externa
+            params.tcampo ? (form.IsVisibleForCustomer = "on") : null;
+
+            // Enviar info a OTOBO
+            await Salem.otrs.ajax({ transform: "form", ...form });
+
+            // Cortar ejecución si el estado enviado corresponde al destino
+            if (jumps.cross[i] == params.destino) break;
+          }
+
+          // Comprobar si la traza fue exitosa
+          let result = await Salem.otrs.middleware(
+            { isState: params.destino },
+            info
+          );
+          resolve(result);
+
+
+        });
       },
 
       ////Traza de estados Preventivos y rutinarios normales/////
@@ -963,7 +963,7 @@ var Salem = {
               ? params.tcampo
               : storage.login.firma;
             form.DynamicField_SEGUIMIENTO = storage.login.firma;
-            form.DynamicField_INTERVENCION = "SI"; 
+            form.DynamicField_INTERVENCION = "SI";
 
             // Poner cambio de técnico si es que el estado actual es igual al destino.
             form.Subject =
@@ -975,7 +975,7 @@ var Salem = {
             params.tcampo ? (form.IsVisibleForCustomer = "on") : null;
 
             // Enviar info a OTOBO
-            
+
             await Salem.otrs.ajax({ transform: "form", ...form });
 
             // Cortar ejecución si el estado enviado corresponde al destino
@@ -989,7 +989,7 @@ var Salem = {
           );
           resolve(result);
           //params.redirect ? Salem.emit({ action: otrs.redirect }) : null
-          });
+        });
       },
       sweepMttoEspeciales: (info, params) => {
         return new Promise(async (resolve) => {
@@ -1042,7 +1042,7 @@ var Salem = {
               ? params.tcampo
               : storage.login.firma;
             form.DynamicField_SEGUIMIENTO = storage.login.firma;
-            form.DynamicField_INTERVENCION = "SI"; 
+            form.DynamicField_INTERVENCION = "SI";
 
             // Poner cambio de técnico si es que el estado actual es igual al destino.
             form.Subject =
@@ -1054,7 +1054,7 @@ var Salem = {
             params.tcampo ? (form.IsVisibleForCustomer = "on") : null;
 
             // Enviar info a OTOBO
-            
+
             await Salem.otrs.ajax({ transform: "form", ...form });
 
             // Cortar ejecución si el estado enviado corresponde al destino
@@ -1068,7 +1068,7 @@ var Salem = {
           );
           resolve(result);
           //params.redirect ? Salem.emit({ action: otrs.redirect }) : null
-          });
+        });
       },
       reload: () => {
         return new Promise(async (resolve) => {
@@ -1089,299 +1089,299 @@ var Salem = {
       getInfo: (req) => {
         return new Promise(async (resolve, reject) => {
           try {
-              let url = window.location.href;
-              if (url.includes("/otobo/index.pl") || (req && typeof req.dom != "undefined")) {
-                  let campos = {};
-                  if (req && req.dom) req.dom = $(req.dom);
+            let url = window.location.href;
+            if (url.includes("/otobo/index.pl") || (req && typeof req.dom != "undefined")) {
+              let campos = {};
+              if (req && req.dom) req.dom = $(req.dom);
 
-                  // Obtener datos del formulario
-                  let form = req && req.dom ? req.dom.find("form").serializeArray() : $("form").serializeArray();
-                  if (form.length != 0) {
-                      let flagLogin = 0;
-                      form.forEach(reg => {
-                          (reg.name == "User" || reg.name == "Password") ? flagLogin++ : null;
-                      });
-                      if (flagLogin == 2) campos.isLogin = true;
-                  }
-
-                    // Obtener campos específicos como ticket, id y token
-                    campos.ticket = (() => {
-                      let headlineText = req && req.dom
-                          ? req.dom.find(".Headline").text()
-                          : $(".Headline").text();
-                      let parts = headlineText.split("—");
-                      if (parts.length > 0) {
-                          let ticketPart = parts[0].split("#");
-                          if (ticketPart.length > 1) {
-                              return ticketPart[1].trim();
-                          }
-                      }
-                      return null;
-                  })();
-                  
-                  campos.id = (() => {
-                      let asPopupElement = req && req.dom
-                          ? req.dom.find(".AsPopup[href*='TicketID=']").first()
-                          : $(".AsPopup[href*='TicketID=']").first();
-                      let href = asPopupElement.attr("href");
-                      if (href) {
-                          let parts = href.split("=");
-                          if (parts.length > 2) {
-                              return parts[2].split(";")[0];
-                          }
-                      }
-                      return null;
-                  })();
-                    
-                  campos.token = req && req.dom
-                      ? req.dom.find('input[name="ChallengeToken"]').val()
-                      : $('input[name="ChallengeToken"]').val();
-
-                      let labels = req && req.dom ? req.dom.find("label") : $("label");
-                      let ps = req && req.dom ? req.dom.find("p") : $("p");
-                      
-                      // Verificar si hay etiquetas de "Servicio"
-                      let isService = req && req.dom
-                          ? req.dom.find('label:contains("Servicio")')
-                          : $('label:contains("Servicio")');
-                      
-                      // Procesar etiquetas de servicio si existen
-                      if (isService.length != 0) {
-                          labels.each(function(index, label) {
-                              let labelText = $(label).text().trim().slice(0, -1); // Quitar el ':' al final del texto
-                              
-                              // Lista de etiquetas a excluir
-                              const excludedLabels = [
-                                  "Communication channel",
-                                  "Sender Type",
-                                  "Grabar configuración de filtros como defecto",
-                                  "Customer visibility",
-                                  "Creado por"
-                              ];
-                              
-                              // Verificar si la etiqueta actual no está en la lista de exclusiones
-                              if (!excludedLabels.some(excluded => labelText.includes(excluded))) {
-                                  let correspondingP = $(label).next('p').text().trim(); // Obtener el párrafo correspondiente
-                                  campos[labelText] = correspondingP;
-                              }
-                          });
-                      }
-                campos.Creado
-                  ? (campos.Creado = moment(
-                    campos.Creado.replace(" - ", " "),
-                    "DD/MM/YYYY HH:mm"
-                  ).format("YYYY-MM-DD HH:mm"))
-                  : (campos.Creado = undefined);
-                campos.titulo = campos.ticket
-                  ? req && req.dom
-                    ? $(req.dom)
-                      .find(".Headline")[0]
-                      .childNodes[3].innerText.trim()
-                    : $(".Headline")[0].childNodes[3].innerText.trim()
-                  : null;
-                campos.rotulo = campos.titulo
-                  ? campos.titulo.split("—")[1].trim()
-                  : null;
-                campos.last_prog = campos.ticket
-                  ? (() => {
-                    let filas =
-                      req && req.dom
-                        ? $(req.dom).find("#ArticleTable tbody tr")
-                        : $("#ArticleTable tbody tr");
-                    let hora = null;
-                    for (let i = filas.length - 1; i >= 0; i--) {
-                      let tit = filas[i].children[5].children[0].title;
-                      if (
-                        tit.includes("PROGRESO") ||
-                        tit.includes("CAMBIO DE T")
-                      ) {
-                        hora = filas[i].children[6].children[0].title.replace(
-                          " - ",
-                          " "
-                        );
-                        break;
-                      }
-                    }
-                    return hora;
-                  })()
-                  : null;
-
-                campos.first_prog = campos.ticket
-                  ? (() => {
-                    let filas =
-                      req && req.dom
-                        ? $(req.dom).find("#ArticleTable tbody tr")
-                        : $("#ArticleTable tbody tr");
-                    let hora = null;
-                    for (let i = 0; i < filas.length; i++) {
-                      let tit = filas[i].children[5].children[0].title;
-                      if (
-                        tit.includes("PROGRESO") ||
-                        tit.includes("CAMBIO DE T")
-                      ) {
-                        hora = filas[i].children[6].children[0].title.replace(
-                          " - ",
-                          " "
-                        );
-                        break;
-                      }
-                    }
-                    return hora;
-                  })()
-                  : null;
-
-                campos.resuelto = campos.ticket
-                  ? (() => {
-                    let filas =
-                      req && req.dom
-                        ? $(req.dom).find("#ArticleTable tbody tr")
-                        : $("#ArticleTable tbody tr");
-                    let hora = null;
-                    for (let i = 0; i < filas.length; i++) {
-                      let tit = filas[i].children[5].children[0].title;
-                      if (tit.toLowerCase().includes("resuelto")) {
-                        hora = filas[i].children[6].children[0].title.replace(
-                          " - ",
-                          " "
-                        );
-                        break;
-                      }
-                    }
-                    if (hora == null) {
-                      if (
-                        [
-                          "RESUELTO",
-                          "CERRADO",
-                          "CERRADO POR INFORMACION",
-                          "ANULADO POR DUPLICIDAD",
-                        ].indexOf(campos.Estado) != -1
-                      ) {
-                        hora = filas[
-                          filas.length - 1
-                        ].children[6].children[0].title.replace(" - ", " ");
-                      }
-                    }
-                    return hora;
-                  })()
-                  : null;
-
-                campos.anulado = campos.ticket
-                  ? (() => {
-                    let filas = req && req.dom ? $(req.dom).find("#ArticleTable tbody tr") : $("#ArticleTable tbody tr");
-                    let campoAnulado = null;
-                    for (let i = filas.length - 1; i >= 0; i--) {
-                      let asunto = $(filas[i]).find("td:eq(5)").text().trim(); 
-                      if (asunto.toLowerCase().includes("anulado")) {
-                        campoAnulado = asunto;
-                        break;
-                      }
-                    }
-                    return campoAnulado;
-                  })()
-                  : null;
-                
-
-
-                campos.partes = campos.ticket
-                  ? (() => {
-                    let filas =
-                      req && req.dom
-                        ? $(req.dom).find(
-                          $('.Header h2:contains("Partes Cambiadas")')
-                            .closest(".WidgetSimple")
-                            .find("table tbody tr")
-                        )
-                        : $('.Header h2:contains("Partes Cambiadas")')
-                          .closest(".WidgetSimple")
-                          .find("table tbody tr");
-                    return Array.from(filas).map((tr) => {
-                      return {
-                        nombre: tr.children[0].innerText,
-                        instalado: tr.children[1].innerText,
-                        retirado: tr.children[2].innerText,
-                      };
-                    });
-                  })()
-                  : [];
-
-                // Extrar nota de creación
-                campos.isZoom = 
-                  campos.id != null && campos.rotulo != null ? true : false;
-
-                let zoomTicket =
-                  req && req.dom
-                    ? $(req.dom).find("#Row1 input").val()
-                    : $("#Row1 input").val();
-                let creacion = zoomTicket
-                  ? zoomTicket
-                    .split(";")
-                    .filter((u) => u.includes("ArticleID"))[0]
-                    .split("=")
-                  : null;
-                if (creacion && campos.token && req && req.getNote == true) {
-                  let htmlView = await Salem.otrs.ajax(
-                    {
-                      Action: "AgentTicketArticleContent",
-                      Subaction: "HTMLView",
-                      TicketID: campos.id,
-                      ArticleID: creacion[1],
-                      transform: "plain",
-                    },
-                    campos.token
-                  );
-                  campos.notaCreacion = $(htmlView).text();
-                }
-
-                if (req && req.getLinks) {
-                  let searchLinked = {
-                    Action: "AgentTicketZoom",
-                    Subaction: "LoadWidget",
-                    TicketID: campos.id,
-                    ElementID: "Async_0001-TicketLinks",
-                  };
-                  let linkedContent = await Salem.otrs.ajax(
-                    { ...searchLinked, transform: "plain" },
-                    campos.token
-                  );
-                  let cards = $(linkedContent).find(".DataTable");
-                  let existLinks = !cards
-                    .text()
-                    .includes("No hay tickets enlazados");
-                  let links = [];
-                  if (existLinks) {
-                    let conv = {
-                      0: "ticket",
-                      1: "rotulo",
-                      2: "Estado",
-                      3: "Cola",
-                      4: "Categoría del Ticket",
-                      5: "Creado",
-                      6: "Parentesco",
-                    };
-                    cards.each((index, card) => {
-                      let rows = $(card).find("tr");
-                      let toPush = {};
-                      rows.each((i, row) => {
-                        let text = $(row).find("td")[1];
-                        if (text) {
-                          conv[i]
-                            ? (toPush[conv[i]] = $(row)
-                              .find("td")[1]
-                              .innerText.trim())
-                            : null;
-                        }
-                      });
-                      links.push(toPush);
-                    });
-                  }
-                  campos.enlaces = links;
-                }
-                resolve(campos);
-              } else {
-                campos = await Salem.core.emit({ action: "getInfo", req: req });
-                resolve(campos);
+              // Obtener datos del formulario
+              let form = req && req.dom ? req.dom.find("form").serializeArray() : $("form").serializeArray();
+              if (form.length != 0) {
+                let flagLogin = 0;
+                form.forEach(reg => {
+                  (reg.name == "User" || reg.name == "Password") ? flagLogin++ : null;
+                });
+                if (flagLogin == 2) campos.isLogin = true;
               }
-            } catch (error) {
+
+              // Obtener campos específicos como ticket, id y token
+              campos.ticket = (() => {
+                let headlineText = req && req.dom
+                  ? req.dom.find(".Headline").text()
+                  : $(".Headline").text();
+                let parts = headlineText.split("—");
+                if (parts.length > 0) {
+                  let ticketPart = parts[0].split("#");
+                  if (ticketPart.length > 1) {
+                    return ticketPart[1].trim();
+                  }
+                }
+                return null;
+              })();
+
+              campos.id = (() => {
+                let asPopupElement = req && req.dom
+                  ? req.dom.find(".AsPopup[href*='TicketID=']").first()
+                  : $(".AsPopup[href*='TicketID=']").first();
+                let href = asPopupElement.attr("href");
+                if (href) {
+                  let parts = href.split("=");
+                  if (parts.length > 2) {
+                    return parts[2].split(";")[0];
+                  }
+                }
+                return null;
+              })();
+
+              campos.token = req && req.dom
+                ? req.dom.find('input[name="ChallengeToken"]').val()
+                : $('input[name="ChallengeToken"]').val();
+
+              let labels = req && req.dom ? req.dom.find("label") : $("label");
+              let ps = req && req.dom ? req.dom.find("p") : $("p");
+
+              // Verificar si hay etiquetas de "Servicio"
+              let isService = req && req.dom
+                ? req.dom.find('label:contains("Servicio")')
+                : $('label:contains("Servicio")');
+
+              // Procesar etiquetas de servicio si existen
+              if (isService.length != 0) {
+                labels.each(function (index, label) {
+                  let labelText = $(label).text().trim().slice(0, -1); // Quitar el ':' al final del texto
+
+                  // Lista de etiquetas a excluir
+                  const excludedLabels = [
+                    "Communication channel",
+                    "Sender Type",
+                    "Grabar configuración de filtros como defecto",
+                    "Customer visibility",
+                    "Creado por"
+                  ];
+
+                  // Verificar si la etiqueta actual no está en la lista de exclusiones
+                  if (!excludedLabels.some(excluded => labelText.includes(excluded))) {
+                    let correspondingP = $(label).next('p').text().trim(); // Obtener el párrafo correspondiente
+                    campos[labelText] = correspondingP;
+                  }
+                });
+              }
+              campos.Creado
+                ? (campos.Creado = moment(
+                  campos.Creado.replace(" - ", " "),
+                  "DD/MM/YYYY HH:mm"
+                ).format("YYYY-MM-DD HH:mm"))
+                : (campos.Creado = undefined);
+              campos.titulo = campos.ticket
+                ? req && req.dom
+                  ? $(req.dom)
+                    .find(".Headline")[0]
+                    .childNodes[3].innerText.trim()
+                  : $(".Headline")[0].childNodes[3].innerText.trim()
+                : null;
+              campos.rotulo = campos.titulo
+                ? campos.titulo.split("—")[1].trim()
+                : null;
+              campos.last_prog = campos.ticket
+                ? (() => {
+                  let filas =
+                    req && req.dom
+                      ? $(req.dom).find("#ArticleTable tbody tr")
+                      : $("#ArticleTable tbody tr");
+                  let hora = null;
+                  for (let i = filas.length - 1; i >= 0; i--) {
+                    let tit = filas[i].children[5].children[0].title;
+                    if (
+                      tit.includes("PROGRESO") ||
+                      tit.includes("CAMBIO DE T")
+                    ) {
+                      hora = filas[i].children[6].children[0].title.replace(
+                        " - ",
+                        " "
+                      );
+                      break;
+                    }
+                  }
+                  return hora;
+                })()
+                : null;
+
+              campos.first_prog = campos.ticket
+                ? (() => {
+                  let filas =
+                    req && req.dom
+                      ? $(req.dom).find("#ArticleTable tbody tr")
+                      : $("#ArticleTable tbody tr");
+                  let hora = null;
+                  for (let i = 0; i < filas.length; i++) {
+                    let tit = filas[i].children[5].children[0].title;
+                    if (
+                      tit.includes("PROGRESO") ||
+                      tit.includes("CAMBIO DE T")
+                    ) {
+                      hora = filas[i].children[6].children[0].title.replace(
+                        " - ",
+                        " "
+                      );
+                      break;
+                    }
+                  }
+                  return hora;
+                })()
+                : null;
+
+              campos.resuelto = campos.ticket
+                ? (() => {
+                  let filas =
+                    req && req.dom
+                      ? $(req.dom).find("#ArticleTable tbody tr")
+                      : $("#ArticleTable tbody tr");
+                  let hora = null;
+                  for (let i = 0; i < filas.length; i++) {
+                    let tit = filas[i].children[5].children[0].title;
+                    if (tit.toLowerCase().includes("resuelto")) {
+                      hora = filas[i].children[6].children[0].title.replace(
+                        " - ",
+                        " "
+                      );
+                      break;
+                    }
+                  }
+                  if (hora == null) {
+                    if (
+                      [
+                        "RESUELTO",
+                        "CERRADO",
+                        "CERRADO POR INFORMACION",
+                        "ANULADO POR DUPLICIDAD",
+                      ].indexOf(campos.Estado) != -1
+                    ) {
+                      hora = filas[
+                        filas.length - 1
+                      ].children[6].children[0].title.replace(" - ", " ");
+                    }
+                  }
+                  return hora;
+                })()
+                : null;
+
+              campos.anulado = campos.ticket
+                ? (() => {
+                  let filas = req && req.dom ? $(req.dom).find("#ArticleTable tbody tr") : $("#ArticleTable tbody tr");
+                  let campoAnulado = null;
+                  for (let i = filas.length - 1; i >= 0; i--) {
+                    let asunto = $(filas[i]).find("td:eq(5)").text().trim();
+                    if (asunto.toLowerCase().includes("anulado")) {
+                      campoAnulado = asunto;
+                      break;
+                    }
+                  }
+                  return campoAnulado;
+                })()
+                : null;
+
+
+
+              campos.partes = campos.ticket
+                ? (() => {
+                  let filas =
+                    req && req.dom
+                      ? $(req.dom).find(
+                        $('.Header h2:contains("Partes Cambiadas")')
+                          .closest(".WidgetSimple")
+                          .find("table tbody tr")
+                      )
+                      : $('.Header h2:contains("Partes Cambiadas")')
+                        .closest(".WidgetSimple")
+                        .find("table tbody tr");
+                  return Array.from(filas).map((tr) => {
+                    return {
+                      nombre: tr.children[0].innerText,
+                      instalado: tr.children[1].innerText,
+                      retirado: tr.children[2].innerText,
+                    };
+                  });
+                })()
+                : [];
+
+              // Extrar nota de creación
+              campos.isZoom =
+                campos.id != null && campos.rotulo != null ? true : false;
+
+              let zoomTicket =
+                req && req.dom
+                  ? $(req.dom).find("#Row1 input").val()
+                  : $("#Row1 input").val();
+              let creacion = zoomTicket
+                ? zoomTicket
+                  .split(";")
+                  .filter((u) => u.includes("ArticleID"))[0]
+                  .split("=")
+                : null;
+              if (creacion && campos.token && req && req.getNote == true) {
+                let htmlView = await Salem.otrs.ajax(
+                  {
+                    Action: "AgentTicketArticleContent",
+                    Subaction: "HTMLView",
+                    TicketID: campos.id,
+                    ArticleID: creacion[1],
+                    transform: "plain",
+                  },
+                  campos.token
+                );
+                campos.notaCreacion = $(htmlView).text();
+              }
+
+              if (req && req.getLinks) {
+                let searchLinked = {
+                  Action: "AgentTicketZoom",
+                  Subaction: "LoadWidget",
+                  TicketID: campos.id,
+                  ElementID: "Async_0001-TicketLinks",
+                };
+                let linkedContent = await Salem.otrs.ajax(
+                  { ...searchLinked, transform: "plain" },
+                  campos.token
+                );
+                let cards = $(linkedContent).find(".DataTable");
+                let existLinks = !cards
+                  .text()
+                  .includes("No hay tickets enlazados");
+                let links = [];
+                if (existLinks) {
+                  let conv = {
+                    0: "ticket",
+                    1: "rotulo",
+                    2: "Estado",
+                    3: "Cola",
+                    4: "Categoría del Ticket",
+                    5: "Creado",
+                    6: "Parentesco",
+                  };
+                  cards.each((index, card) => {
+                    let rows = $(card).find("tr");
+                    let toPush = {};
+                    rows.each((i, row) => {
+                      let text = $(row).find("td")[1];
+                      if (text) {
+                        conv[i]
+                          ? (toPush[conv[i]] = $(row)
+                            .find("td")[1]
+                            .innerText.trim())
+                          : null;
+                      }
+                    });
+                    links.push(toPush);
+                  });
+                }
+                campos.enlaces = links;
+              }
+              resolve(campos);
+            } else {
+              campos = await Salem.core.emit({ action: "getInfo", req: req });
+              resolve(campos);
+            }
+          } catch (error) {
             reject(error);
           }
         });
@@ -1792,8 +1792,8 @@ var Salem = {
   rules: {
     storage: "salemMemory",
     api: {
-      dev: "https://script.google.com/macros/s/AKfycbzX4xiWIs7Am6V4sIIB94G2awBwyZ0LlUIPeZyCrAE9/dev?access_token=",
-      prod: "https://script.google.com/macros/s/AKfycbyhgATNOV4AOCHKq8Wd2o6Ps7IG7st-XAvmVTSHSi3ikFKjoBbxXNLqxCI7Jpao9VupbQ/exec",
+      dev: "https://script.google.com/macros/s/AKfycbw9iEQ5I8ZXqHyMG8KbvkSKqP9CLkc7UKGeYMFk9WY/dev?access_token=",
+      prod: "https://script.google.com/macros/s/AKfycbxIjCSxv1abCQE0kk4BWALYSsM3HuHd1kvlHu2a41JSnAJfOVmB1-kXBqp7oEgmdKO5/exec",
     },
     routes: {
       otrs: "https://helpdesk.rbsas.co/otobo/index.pl",
@@ -1881,6 +1881,22 @@ var Salem = {
             "Realice cambios de estado de acuerdo al árbol de secuencias establecido.",
           middleware: { isOTRS: "", isZoom: "" },
         },
+        updateRutinarios: {
+          view: "/sources/popup/menus/utils/updateRutinarios/updateRutinarios.html",
+          script: "/sources/popup/menus/utils/updateRutinarios/updateRutinarios.js",
+          title: "Cargar Mtto Rutinarios",
+          message:
+            "Carga los mantenimientos rutinarios de manera automatica.",
+          middleware: { isOTRS: "", isZoom: "" },
+        },
+        updatePreventivos: {
+          view: "/sources/popup/menus/utils/updatePreventivos/updatePreventivos.html",
+          script: "/sources/popup/menus/utils/updatePreventivos/updatePreventivos.js",
+          title: "Cargar Mtto Preventivos",
+          message:
+            "Reporte los equipos de mantenimiento preventivo que no se encuentran en OTOBO.",
+          middleware: { isOTRS: "", isZoom: "" },
+        },
         preferences: {
           view: "/sources/popup/menus/toolkit/preferences/preferences.html",
           script: "/sources/popup/menus/toolkit/preferences/preferences.js",
@@ -1896,8 +1912,8 @@ var Salem = {
             isOTRS: "",
             isZoom: "",
             isState: [
-             "PROGRESO MTTO PREVENTIVO",
-             "EN PROGRESO"
+              "PROGRESO MTTO PREVENTIVO",
+              "EN PROGRESO"
 
             ]
           },

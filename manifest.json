@@ -1,12 +1,14 @@
 {
     "name": "Salem",
-    "version": "1.2.3.2",
+    "version": "1.2.3.3",
     "manifest_version": 3,
     "description": "Salem, asistente para ayudar a optimizar la documentación de tickets de OTOBO en SOMI Estaciones.",
     "content_scripts": [
         {
             "matches": [
-                "https://helpdesk.rbsas.co/otobo/index.pl*"
+                "https://helpdesk.rbsas.co/otobo/*",
+                "https://172.20.0.80/otobo/*",
+                "http://172.20.0.80/otobo/*"
             ],
             "js": [
                 "/sources/vendor/js/moment.min.js",
@@ -41,6 +43,11 @@
         "storage",
         "tabs",
         "contextMenus"
+    ],
+    "host_permissions": [
+        "https://helpdesk.rbsas.co/*",
+        "https://172.20.0.80/*",
+        "http://172.20.0.80/*"
     ],
     "web_accessible_resources": [
         {

@@ -482,6 +482,13 @@ var Salem = {
           typeof token != "undefined"
             ? { token }
             : await Salem.core.runtime.getInfo();
+
+        if (!info || !info.token) {
+          console.warn("Salem :: No se pudo obtener el ChallengeToken. Verifique que la pestaña de OTOBO esté activa y cargada.");
+          resolve(null);
+          return;
+        }
+
         payload.ChallengeToken = info.token;
         let params = $.param(payload, true);
         $.ajax({
@@ -1379,7 +1386,7 @@ var Salem = {
               resolve(campos);
             } else {
               campos = await Salem.core.emit({ action: "getInfo", req: req });
-              resolve(campos);
+              resolve(campos || {});
             }
           } catch (error) {
             reject(error);
@@ -1601,6 +1608,120 @@ var Salem = {
       $('[data-tag="sidebar-content"]').html(error);
     },
     /**
+     * Exporta datos a un archivo Excel (.xlsx) con formato profesional.
+     * Utiliza la librería ExcelJS para aplicar estilos, centrado y auto-ajuste de columnas.
+     * 
+     * @param {Object} data - Objeto donde cada clave es el nombre de la hoja y el valor es un Array de Objetos con los datos.
+     * @param {String} fileName - Nombre del archivo de salida.
+     * @param {String} creator - Nombre del creador/módulo para los metadatos.
+     */
+    excelExport: async (data, fileName, creator = 'Salem') => {
+      if (typeof ExcelJS === 'undefined') {
+        throw new Error('La librería ExcelJS no está cargada.');
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = creator;
+      workbook.created = new Date();
+
+      for (const [sheetName, sheetRows] of Object.entries(data)) {
+        if (!Array.isArray(sheetRows) || sheetRows.length === 0) continue;
+
+        // 1. Obtener nombres de columnas y filtrar las que están completamente vacías
+        const allKeys = Object.keys(sheetRows[0]);
+        const validKeys = allKeys.filter(key => {
+          const isInternal = ['key', 'deployment', 'status', 'index'].includes(key);
+          const hasName = key && key.trim().length > 0;
+          if (isInternal || !hasName) return false;
+
+          // Verificar si al menos una fila tiene datos en esta columna
+          return sheetRows.some(row => {
+            const val = row[key];
+            return val !== null && val !== undefined && String(val).trim() !== '';
+          });
+        });
+
+        if (validKeys.length === 0) continue;
+
+        // 2. Crear hoja y definir columnas
+        const safeSheetName = sheetName.substring(0, 31).replace(/[\/?*\[\]]/g, '');
+        const worksheet = workbook.addWorksheet(safeSheetName);
+
+        worksheet.columns = validKeys.map(key => ({
+          header: String(key).toUpperCase(),
+          key: key,
+          width: 15
+        }));
+
+        // 3. Agregar datos
+        sheetRows.forEach(row => {
+          const cleanRow = {};
+          validKeys.forEach(key => cleanRow[key] = row[key]);
+          worksheet.addRow(cleanRow);
+        });
+
+        // 4. Aplicar Estilos (Encabezados y Celdas)
+        const headerRow = worksheet.getRow(1);
+        headerRow.height = 20;
+
+        worksheet.columns.forEach((col, i) => {
+          const cell = headerRow.getCell(i + 1);
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF4472C4' } // Azul profesional
+          };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' }
+          };
+        });
+
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber > 1) {
+            row.alignment = { horizontal: 'center', vertical: 'middle' };
+            worksheet.columns.forEach((col, i) => {
+              const cell = row.getCell(i + 1);
+              if (cell) {
+                cell.border = {
+                  top: { style: 'thin' }, left: { style: 'thin' },
+                  bottom: { style: 'thin' }, right: { style: 'thin' }
+                };
+              }
+            });
+          }
+        });
+
+        // 5. Auto-ajustar ancho de columnas
+        worksheet.columns.forEach((column, index) => {
+          let maxLength = column.header ? column.header.length : 10;
+          worksheet.eachRow({ includeEmpty: false }, (row) => {
+            const cell = row.getCell(index + 1);
+            if (cell.value) {
+              const cellLength = cell.value.toString().length;
+              if (cellLength > maxLength) maxLength = cellLength;
+            }
+          });
+          column.width = Math.min(Math.max(maxLength + 2, 10), 200);
+        });
+      }
+
+      if (workbook.worksheets.length > 0) {
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        return true;
+      }
+      return false;
+    },
+    /**
      * Despliega un mensaje emergente en pantalla (bottomRight)
      * @param {JSON} config
      * Se espera tener {title, message, type, timeout?}
@@ -1770,9 +1891,6 @@ var Salem = {
             ? (storage = { dev: access.token })
             : (storage.dev = access.token);
           await Salem.core.mem.set(storage);
-          console.log(
-            "Salem API Rest :: Se ha establecido el entorno de pruebas exitosamente."
-          );
           resolve();
         });
       },
@@ -1781,9 +1899,6 @@ var Salem = {
           let storage = await Salem.core.mem.get();
           storage ? (storage.dev = undefined) : null;
           await Salem.core.mem.set(storage);
-          console.log(
-            "Salem API Rest :: Se ha establecido el entorno de producción exitosamente."
-          );
           resolve();
         });
       },
@@ -1852,27 +1967,8 @@ var Salem = {
           title: "Bulk",
           message: "Visualice múltiples tickets de OTOBO de manera simultánea.",
         },
-        downloadMpp: {
-          view: "/sources/popup/menus/pendientes/mpp/mpp.html",
-          script: "/sources/popup/menus/pendientes/mpp/mpp.js",
-          title: "Descargar preventivos pendientes",
-          message:
-            "Descargue la información de los mantenimientos preventivos.",
-        },
-        downloadRut: {
-          view: "/sources/popup/menus/pendientes/rutinarios/rut.html",
-          script: "/sources/popup/menus/pendientes/rutinarios/rut.js",
-          title: "Descargar rutinarios pendientes",
-          message: "Descargue la información de los mantenimientos rutinarios.",
-        },
-        downloadRutinariosTDA: {
-          view: "/sources/popup/menus/pendientes/tdarut/tdarut.html",
-          script: "/sources/popup/menus/pendientes/tdarut/tdarut.js",
-          title: "TDA Rutinarios",
-          message:
-            "Descargue y actualice la información de los tickets de mantenimiento rutinario con +1 horas.",
-          middleware: { isOTRS: "", isAlive: "" },
-        },
+
+
         sweep: {
           view: "/sources/popup/menus/utils/sweep/sweep.html",
           script: "/sources/popup/menus/utils/sweep/sweep.js",
@@ -1887,7 +1983,7 @@ var Salem = {
           title: "Cargar Mtto Rutinarios",
           message:
             "Carga los mantenimientos rutinarios de manera automatica.",
-          middleware: { isOTRS: "", isZoom: "" },
+          middleware: { isOTRS: "" },
         },
         updatePreventivos: {
           view: "/sources/popup/menus/utils/updatePreventivos/updatePreventivos.html",
@@ -1895,13 +1991,26 @@ var Salem = {
           title: "Cargar Mtto Preventivos",
           message:
             "Reporte los equipos de mantenimiento preventivo que no se encuentran en OTOBO.",
-          middleware: { isOTRS: "", isZoom: "" },
+          middleware: { isOTRS: "" },
+        },
+        updateCheckRutinarios: {
+          view: "/sources/popup/menus/utils/updateCheckRutinarios/updateCheckRutinarios.html",
+          script: "/sources/popup/menus/utils/updateCheckRutinarios/updateCheckRutinarios.js",
+          title: "Verificar Mtto Rutinarios",
+          message:
+            "Visualice y verifique los mantenimientos rutinarios.",
+          middleware: { isOTRS: "" },
         },
         preferences: {
           view: "/sources/popup/menus/toolkit/preferences/preferences.html",
           script: "/sources/popup/menus/toolkit/preferences/preferences.js",
           title: "Preferencias",
           message: "Establezca las preferencias de su usuario.",
+        },
+        report: {
+          view: "/sources/client/modals/report/report.html",
+          title: "Reportar Novedad",
+          message: "Envíe un reporte de novedad vía correo electrónico."
         },
         close: {
           view: "/sources/popup/menus/utils/close/close.html",

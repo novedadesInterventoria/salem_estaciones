@@ -1,0 +1,61 @@
+<style>
+    /* Fix: Asegurar que el modal esté por encima de todo (incluido el backdrop y menú lateral) */
+    #reportModal {
+        z-index: 100000 !important;
+    }
+
+    /* El backdrop debe estar justo debajo del modal */
+    .modal-backdrop {
+        z-index: 99999 !important;
+    }
+</style>
+<div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true"
+    data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="reportModalLabel">
+                    <i class="fas fa-envelope-open-text me-2"></i>Reportar Novedad
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="reportForm">
+
+
+                    <div class="mb-3">
+                        <label for="reportType" class="form-label fw-semibold">Asunto del Correo</label>
+                        <input type="text" class="form-control" id="reportType"
+                            placeholder="Ej: Error en datos del equipo o Mantenimiento no realizado" required>
+                    </div>
+
+                    <!-- Inputs de correo y asunto eliminados por solicitud (Configuración fija) -->
+
+                    <div class="mb-3">
+                        <label for="reportMessage" class="form-label fw-semibold">Mensaje</label>
+                        <div id="reportMessageEditor"
+                            style="min-height: 200px; border: 1px solid #ced4da; border-radius: 0.25rem;"></div>
+                        <textarea id="reportMessage" class="d-none"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-label fw-semibold">Evidencia (Opcional)</div>
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="reportEvidence" accept="image/*,.pdf" multiple>
+                            <label class="input-group-text" for="reportEvidence"><i
+                                    class="fas fa-paperclip"></i></label>
+                        </div>
+                        <div class="form-text">Adjunte capturas de pantalla o documentos relevantes.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="reportForm" class="btn btn-primary" id="btnSendReport">
+                    <i class="fas fa-paper-plane me-2"></i>Enviar Reporte
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

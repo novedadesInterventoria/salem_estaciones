@@ -1,17 +1,18 @@
-﻿$(() => {
-    // Estado de la aplicación
+$(() => {
+    // Estado de la aplicaci�n
     const state = {
         allData: {},
         currentData: [],
         currentEquipo: '',
-        currentColumns: []
+        currentColumns: [],
+        selectedRows: []
     };
 
     // Configuraciones
     const CONFIG = {
         equipoNames: {
             cctv: '1. CCTV',
-            ups: '2. UPS EST-2',
+            ups: '2. UPS EST-1',
             bca: '3. BCA',
             tca: '4. TCA',
             tcs: '5. TCS',
@@ -31,10 +32,13 @@
             realizados: '#28a745',
             pendientes: '#ffc107',
             total: '#6c757d'
+        },
+        report: {
+            subjectPrefix: 'Novedad: '
         }
     };
 
-    // Inicialización
+    // Inicializaci�n
     init();
 
     function init() {
@@ -48,11 +52,37 @@
         $('#clearSearch').on('click', clearSearch);
         $('#toggleKPIs').on('click', loadKPIs);
         $('#downloadPendientes').on('click', downloadPendientes);
+        $('#btnOpenReport').on('click', openReportModal);
+
+        // Selección de filas en la tabla
+        $('#preventivosTableBody').on('click', 'tr', function () {
+            const rowId = $(this).data('row-id');
+            const rowData = state.currentData.find(r => (r.TICKET || r.ticket || r.ID || r.id || '').toString() === rowId.toString());
+
+            if (!rowData) return;
+
+            $(this).toggleClass('table-primary selected-row');
+
+            if ($(this).hasClass('selected-row')) {
+                const idProp = rowData.TICKET ? 'TICKET' : (rowData.ticket ? 'ticket' : (rowData.ID ? 'ID' : 'id'));
+                if (!state.selectedRows.some(r => r[idProp] === rowData[idProp])) {
+                    state.selectedRows.push(rowData);
+                }
+            } else {
+                const idProp = rowData.TICKET ? 'TICKET' : (rowData.ticket ? 'ticket' : (rowData.ID ? 'ID' : 'id'));
+                state.selectedRows = state.selectedRows.filter(r => r[idProp] !== rowData[idProp]);
+            }
+        });
+
+        // Prevenir el envío del formulario al presionar Enteros
+        $('#updatePreventivos').on('submit', function (e) {
+            e.preventDefault();
+        });
     }
 
     // Carga de datos
     async function loadPreventivos() {
-        await showLoading('Consultando mtto Preventivos', 'Se están obteniendo los mantenimientos preventivos.');
+        await showLoading('Consultando mtto Preventivos', 'Se estn obteniendo los mantenimientos preventivos.');
 
         try {
             const response = await Salem.core.api({
@@ -74,7 +104,7 @@
         } catch (error) {
             await hideLoading();
             console.error('Error loading preventivos:', error);
-            showToast('Error al cargar datos', error.message || 'Ocurrió un error desconocido', 'error');
+            showToast('Error al cargar datos', error.message || 'Ocurri� un error desconocido', 'error');
             showEmptyState('Error al cargar los datos. Por favor, intente nuevamente.');
         }
     }
@@ -86,11 +116,13 @@
         if (!equipoKey) {
             resetState();
             clearKPIs();
+            state.selectedRows = [];
             showEmptyState('Seleccione un tipo de equipo para ver los datos.');
             return;
         }
 
         state.currentEquipo = equipoKey;
+        state.selectedRows = [];
         const equipoData = state.allData[equipoKey];
 
         if (!equipoData) {
@@ -105,13 +137,41 @@
 
     function loadEquipoData(equipoData, equipoKey) {
         const rawData = equipoData.data || [];
+        state.currentData = [];
+        state.currentColumns = [];
 
         if (rawData.length > 0) {
-            state.currentColumns = rawData[0];
-            state.currentData = processEquipoData(rawData.slice(1), state.currentColumns, equipoKey);
-        } else {
-            state.currentColumns = [];
-            state.currentData = [];
+            // Backend Salem.utils.query returns Array of Objects
+            if (typeof rawData[0] === 'object' && !Array.isArray(rawData[0])) {
+                // Extract columns from the first object keys
+                // We use the 'columns' from config if available to ensure order, or fall back to keys
+                // backend returns columns in 'columns' property sometimes? No, it returns {data: [], columns: []} in dashPreventivos
+
+                if (equipoData.columns && equipoData.columns.length > 0) {
+                    state.currentColumns = equipoData.columns;
+                } else {
+                    // Si no, intentar inferir, pero ignorando keys que parecen basura de totales
+                    const validKeys = [
+                        'ticket', 'linea', 'estacion', 'ubicacion', 'id', 'equipo',
+                        'fecha', 'estado', 'tecnico', 'asunto', 'direccion', 'modelo', 'empresa'
+                    ];
+
+                    state.currentColumns = Object.keys(rawData[0]).filter(key =>
+                        validKeys.includes(key.toLowerCase())
+                    );
+                }
+
+                // Add tipoEquipo to each row
+                state.currentData = rawData.map(row => ({
+                    ...row,
+                    tipoEquipo: CONFIG.equipoNames[equipoKey] || equipoKey
+                }));
+            }
+            // Legacy/Matrix support (Array of Arrays)
+            else if (Array.isArray(rawData[0])) {
+                state.currentColumns = rawData[0];
+                state.currentData = processEquipoData(rawData.slice(1), state.currentColumns, equipoKey);
+            }
         }
 
         updateTableHeaders(state.currentColumns);
@@ -119,7 +179,7 @@
         updateRecordCount(state.currentData.length);
         $('#resultsInfo').addClass('d-none');
 
-        // Calcular y mostrar KPIs automáticamente
+        // Calcular y mostrar KPIs autom�ticamente
         loadKPIs();
     }
 
@@ -163,7 +223,7 @@
             state.currentColumns.some(col => {
                 const value = (row[col] || '').toString().toLowerCase();
 
-                // Si la columna contiene "FECHA", también buscar en el formato formateado
+                // Si la columna contiene "FECHA", tambi�n buscar en el formato formateado
                 if (col.toUpperCase().includes('FECHA')) {
                     const formattedDate = formatDate(row[col]).toLowerCase();
                     return value.includes(searchTerm) || formattedDate.includes(searchTerm);
@@ -194,12 +254,18 @@
             return;
         }
 
-        data.forEach(row => {
+        data.forEach((row, index) => {
             const tdElements = state.currentColumns.map(col =>
                 createTableCell(col, row[col])
             ).join('');
 
-            tbody.append(`<tr>${tdElements}</tr>`);
+            const rowId = row.TICKET || row.ticket || row.ID || row.id || index;
+            const isSelected = state.selectedRows.some(r =>
+                (r.TICKET || r.ticket || r.ID || r.id) === (row.TICKET || row.ticket || row.ID || row.id)
+            );
+            const selectedClass = isSelected ? 'table-primary selected-row' : '';
+
+            tbody.append(`<tr data-row-id="${rowId}" class="${selectedClass}">${tdElements}</tr>`);
         });
     }
 
@@ -281,7 +347,7 @@
         const container = $('#kpisContainer');
         container.empty();
 
-        // Destruir gráficos existentes
+        // Destruir gr�ficos existentes
         if (state.chartInstances && typeof state.chartInstances === 'object') {
             Object.values(state.chartInstances).forEach(chart => {
                 if (chart) chart.destroy();
@@ -326,7 +392,7 @@
     // ========== KPIs FUNCTIONS ==========
 
     async function loadKPIs() {
-        await showLoading('Calculando KPIs', 'Procesando indicadores de gestión...');
+        await showLoading('Calculando KPIs', 'Procesando indicadores de gesti�n...');
 
         try {
             // Verificar que haya datos cargados
@@ -338,7 +404,6 @@
 
             // Calcular KPIs desde los datos ya cargados
             const kpisData = calculateKPIsFromData();
-            console.log('1. KPIs calculados:', kpisData);
 
             await hideLoading();
 
@@ -348,11 +413,8 @@
                     done: true,
                     data: kpisData
                 };
-                console.log('2. Response creado:', response);
 
                 const loaded = loadKPIData(response);
-                console.log('3. Loaded result:', loaded);
-                console.log('4. state.kpisData:', state.kpisData);
 
                 if (loaded) {
                     renderKPICharts();
@@ -365,7 +427,7 @@
         } catch (error) {
             await hideLoading();
             console.error('Error calculating KPIs:', error);
-            showToast('Error al calcular KPIs', error.message || 'Ocurrió un error desconocido', 'error');
+            showToast('Error al calcular KPIs', error.message || 'Ocurri� un error desconocido', 'error');
         }
     }
 
@@ -374,42 +436,31 @@
 
         // Solo calcular KPIs para el equipo actualmente seleccionado
         if (!state.currentEquipo) {
-            console.warn('No hay equipo seleccionado');
             return kpis;
         }
 
         const equipoKey = state.currentEquipo;
-        const equipoData = state.allData[equipoKey];
+        // Usar state.currentData que ya est normalizado (Array de Objetos)
+        const data = state.currentData || [];
 
-        if (!equipoData) {
-            console.warn(`No hay datos para el equipo ${equipoKey}`);
+        if (data.length === 0) {
             return kpis;
         }
 
-        const rawData = equipoData.data || [];
-
-        if (rawData.length === 0) {
-            console.warn(`Datos vacíos para ${equipoKey}`);
-            return kpis;
-        }
-
-        const headers = rawData[0];
-        const rows = rawData.slice(1);
-
-        const estadoIndex = headers.findIndex(h =>
-            h && h.toString().toUpperCase().includes('ESTADO')
+        // Buscar el nombre de la columna 'estado'
+        const estadoCol = state.currentColumns.find(col =>
+            col && col.toString().toUpperCase().includes('ESTADO')
         );
 
-        if (estadoIndex === -1) {
-            console.warn(`No se encontró columna ESTADO para ${equipoKey}`);
+        if (!estadoCol) {
             return kpis;
         }
 
-        let total = rows.length;
+        let total = data.length;
         let pendientes = 0;
 
-        rows.forEach(row => {
-            const estado = row[estadoIndex];
+        data.forEach(row => {
+            const estado = row[estadoCol];
             if (!estado || estado.toString().trim() === '') {
                 pendientes++;
             }
@@ -426,18 +477,15 @@
             ['EQUIPOS REALIZADOS', realizados]
         ];
 
-        console.log('KPIs calculados para', equipoKey, ':', kpis);
         return kpis;
     }
 
     function loadKPIData(apiResponse) {
         if (!apiResponse || !apiResponse.data) {
-            console.error('Respuesta del API inválida');
             return false;
         }
 
         if (typeof apiResponse.data !== 'object' || Array.isArray(apiResponse.data)) {
-            console.error('Los datos del API deben ser un objeto con claves de equipos');
             return false;
         }
 
@@ -450,12 +498,10 @@
         }
 
         if (Object.keys(cleanedData).length === 0) {
-            console.error('No se encontraron datos válidos de equipos');
             return false;
         }
 
         state.kpisData = cleanedData;
-        console.log('KPIs cargados exitosamente:', cleanedData);
         return true;
     }
 
@@ -463,7 +509,7 @@
         const container = $('#kpisContainer');
         container.empty();
 
-        // Destruir gráficos anteriores con validación
+        // Destruir grficos anteriores con validacin
         if (state.chartInstances && typeof state.chartInstances === 'object') {
             Object.values(state.chartInstances).forEach(chart => {
                 if (chart) chart.destroy();
@@ -516,7 +562,6 @@
         const kpiData = parseEquipoKPIData(data);
 
         if (!kpiData) {
-            console.warn(`No se pudieron procesar los datos para ${equipoKey}`);
             return;
         }
 
@@ -568,10 +613,8 @@
     }
 
     function parseEquipoKPIData(data) {
-        console.log('parseEquipoKPIData recibió:', data);
 
         if (!Array.isArray(data) || data.length < 3) {
-            console.warn('parseEquipoKPIData: datos inválidos', data);
             return null;
         }
 
@@ -579,7 +622,6 @@
         const pendientes = parseInt(data[1][1]) || 0;
         const realizados = parseInt(data[2][1]) || 0;
 
-        console.log('parseEquipoKPIData resultado:', { total, pendientes, realizados });
         return { total, pendientes, realizados };
     }
 
@@ -616,77 +658,282 @@
         $(`#stats-${equipoKey}`).html(statsHtml);
     }
 
-    // ========== DOWNLOAD PENDIENTES ==========
+    // ========== DOWNLOAD PENDIENTES (ExcelJS) ==========
 
+    /**
+     * Genera y descarga un archivo Excel con los datos de mantenimientos preventivos pendientes.
+     * Utiliza la utilidad centralizada Salem.utils.excelExport.
+     */
     async function downloadPendientes() {
-        await showLoading('Descargando', 'Obteniendo tickets pendientes de mantenimiento preventivo...');
+        if (!state.allData || Object.keys(state.allData).length === 0) {
+            Salem.utils.toast({ title: 'Sin Datos', message: 'No hay datos cargados para descargar.', type: 'warning' });
+            return;
+        }
+
+        await Salem.utils.loading({ title: 'Descargando', message: 'Generando archivo Excel...' });
 
         try {
-            // Obtener el plan activo de preventivos desde storage
-            const plan = storage.config.planes.active.contractual;
+            const plan = moment().format('Q'); // Trimestre actual
+            const dataToExport = {};
+            let totalPendientes = 0;
 
-            if (!plan) {
-                throw new Error('No se encontró el plan de preventivos configurado');
-            }
+            for (const [equipoKey, equipoObj] of Object.entries(state.allData)) {
+                const equipoNombre = CONFIG.equipoNames[equipoKey] || equipoKey;
+                const rawData = equipoObj.data || [];
+                if (rawData.length === 0) continue;
 
-            // Llamar al API para obtener los pendientes
-            const jsonRes = await Salem.core.api({
-                action: 'pendientes',
-                subaction: 'preventivos',
-                plan: plan,
-                config: storage.config.planes
-            });
+                let sheetData = [];
+                let columns = [];
 
-            await hideLoading();
-
-            if (jsonRes && typeof jsonRes === 'object') {
-                // Crear un nuevo libro de Excel
-                const wb = XLSX.utils.book_new();
-                let totalPendientes = 0;
-
-                // Recorrer cada equipo y crear una hoja por cada uno
-                for (const [equipoNombre, equipoData] of Object.entries(jsonRes)) {
-                    if (Array.isArray(equipoData) && equipoData.length > 0) {
-                        // Limpiar datos innecesarios
-                        const cleanData = equipoData.map(item => {
-                            const cleaned = { ...item };
-                            delete cleaned.key;
-                            delete cleaned.deployment;
-                            delete cleaned.status;
-                            delete cleaned.index;
-                            return cleaned;
-                        });
-
-                        // Crear hoja para este equipo
-                        const ws = XLSX.utils.json_to_sheet(cleanData);
-
-                        // Nombre de la hoja (máximo 31 caracteres para Excel)
-                        const sheetName = equipoNombre.substring(0, 31);
-
-                        // Agregar hoja al libro
-                        XLSX.utils.book_append_sheet(wb, ws, sheetName);
-
-                        totalPendientes += cleanData.length;
-                    }
+                // 1. Normalizar datos a Array de Objetos (Misma lógica que Rutinarios)
+                if (typeof rawData[0] === 'object' && !Array.isArray(rawData[0])) {
+                    columns = Object.keys(rawData[0]);
+                    sheetData = rawData;
+                } else if (Array.isArray(rawData[0])) {
+                    columns = rawData[0];
+                    sheetData = processEquipoData(rawData.slice(1), columns, equipoKey);
                 }
 
-                // Verificar si hay datos para descargar
-                if (wb.SheetNames.length > 0) {
-                    // Generar y descargar el archivo
-                    XLSX.writeFile(wb, `Pendientes Mtto Preventivo ${plan} ${moment().format('DD-MM-YYYY HH_mm')}.xlsx`);
+                const isPP = equipoNombre === '8. PP';
+                let processedRows = [];
 
-                    showToast('Descarga Exitosa', `Se descargaron ${totalPendientes} tickets pendientes en ${wb.SheetNames.length} hojas`, 'success');
+                if (isPP) {
+                    // Procesamiento especial para equipo "PP" (Puntos Presenciales)
+                    processedRows = sheetData.map(item => ({
+                        'TICKET': item.ticket || item.Ticket || '',
+                        'MODELO': item.modelo || item.Modelo || '',
+                        'DIRECCIÓN': item.direccion || item['Dirección'] || item.Direccion || '',
+                        'ESTADO': item.estado || item.Estado || '',
+                        'TÉCNICO': item.tecnico || item['Técnico'] || item.Tecnico || '',
+                        'ASUNTO': item.asunto || item.Asunto || ''
+                    }));
                 } else {
-                    showToast('Sin Pendientes', 'No hay tickets pendientes de mantenimiento preventivo', 'info');
+                    // Procesamiento estándar para otros tipos de equipos
+                    processedRows = sheetData.map(item => {
+                        const cleaned = {};
+                        Object.keys(item).forEach(key => {
+                            const upperKey = key.toUpperCase().trim();
+                            // Excluir claves internas y vacías
+                            const isInternal = ['KEY', 'DEPLOYMENT', 'STATUS', 'INDEX', 'TIPOEQUIPO', ''].includes(upperKey);
+                            if (!isInternal) {
+                                const newKey = cleanColumnName(key).toUpperCase();
+                                if (newKey && newKey.trim() !== '') {
+                                    cleaned[newKey] = item[key];
+                                }
+                            }
+                        });
+                        return cleaned;
+                    });
                 }
-            } else {
-                showToast('Sin Pendientes', 'No hay tickets pendientes de mantenimiento preventivo', 'info');
+
+                if (processedRows.length > 0) {
+                    const sheetName = equipoNombre.replace(/^\d+\.\s*/, '');
+                    dataToExport[sheetName] = processedRows;
+                    totalPendientes += processedRows.length;
+                }
             }
+
+            const fileName = `Pendientes_Mtto_Preventivo_Q${plan}_${moment().format('YYYY-MM-DD_HHmm')}.xlsx`;
+            const success = await Salem.utils.excelExport(dataToExport, fileName, 'Salem - Mtto Preventivos');
+
+            if (success) {
+                Salem.utils.toast({
+                    title: 'Descarga Completada',
+                    message: `Se descargaron ${totalPendientes} pendientes exitosamente.`,
+                    type: 'success'
+                });
+            } else {
+                Salem.utils.toast({ title: 'Aviso', message: 'No se encontraron datos habilitados para exportar.', type: 'info' });
+            }
+
         } catch (error) {
-            await hideLoading();
-            console.error('Error downloading pendientes:', error);
-            showToast('Error al Descargar', error.message || 'Ocurrió un error al descargar los pendientes', 'error');
+            Salem.utils.toast({ title: 'Error al Exportar', message: error.message, type: 'error' });
+        } finally {
+            await Salem.utils.loading();
         }
     }
-});
 
+    /**
+     * Limpia y normaliza el nombre de una columna.
+     */
+    function cleanColumnName(name) {
+        if (!name) return '';
+        return name
+            .replace(/DynamicField_/g, '')
+            .replace(/[_-]/g, ' ')
+            .trim();
+    }
+
+    // ========== REPORT FUNCTIONALITY ==========
+
+    /**
+     * Abre el modal de reporte de novedades.
+     * Carga el parcial HTML, lo inserta en el DOM y maneja el ciclo de vida del modal.
+     */
+    async function openReportModal() {
+        // FIX: La ruta correcta es Salem.rules.routes.panels.report.view
+        // FIX: Se debe pasar un objeto vacío como segundo argumento para evitar error en Object.keys
+        const reportModalHtml = await Salem.utils.partials.get(Salem.rules.routes.panels.report.view, {});
+        $('body').append(reportModalHtml);
+
+        const modalEl = document.getElementById('reportModal');
+        const modal = new bootstrap.Modal(modalEl);
+
+        modal.show();
+
+        // Inicializar CKEditor
+        let reportEditor;
+        try {
+            reportEditor = await ClassicEditor.create(document.querySelector('#reportMessageEditor'), {
+                placeholder: 'Describa la novedad con detalle...',
+                toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo']
+            });
+        } catch (error) {
+            console.error('Error al inicializar CKEditor:', error);
+            $('#reportMessageEditor').hide();
+            $('#reportMessage').removeClass('d-none').addClass('form-control');
+        }
+
+        // Manejo de Mensajes Rápidos
+        $('.quick-msg').on('click', function () {
+            const msg = $(this).data('msg');
+            if (reportEditor) {
+                const currentData = reportEditor.getData();
+                reportEditor.setData(currentData + `<p>${msg}</p>`);
+            }
+        });
+
+        // Importar selección
+        $('#btnImportSelected').on('click', function () {
+            if (state.selectedRows.length === 0) {
+                Salem.utils.toast({ title: 'Aviso', message: 'No hay filas seleccionadas en la tabla.', type: 'info' });
+                return;
+            }
+
+            let html = '<h6>Equipos Seleccionados:</h6><ul>';
+            state.selectedRows.forEach(row => {
+                const id = row.TICKET || row.ticket || row.ID || row.id || 'N/A';
+                const equipo = row.EQUIPO || row.equipo || row.MODELO || row.modelo || 'N/A';
+                const estacion = row.ESTACION || row.estacion || row.DIRECCIÓN || row['DIRECCIÓN'] || 'N/A';
+                html += `<li><strong>${equipo} (${id})</strong> - Estación: ${estacion}</li>`;
+            });
+            html += '</ul>';
+
+            if (reportEditor) {
+                const currentData = reportEditor.getData();
+                reportEditor.setData(currentData + html);
+            }
+        });
+
+        // Handle form submission
+        $('#btnSendReport').on('click', async function (e) {
+            e.preventDefault();
+
+            // Sincronizar datos si el editor existe
+            if (reportEditor) {
+                $('#reportMessage').val(reportEditor.getData());
+            }
+
+            const form = $('#reportForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+
+            await handleSendReport(modal, modalEl);
+        });
+
+        // Cleanup on close
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            if (reportEditor) {
+                reportEditor.destroy().catch(err => console.error(err));
+            }
+            $(this).remove();
+        });
+    }
+
+    /**
+     * Procesa el envío del reporte al API.
+     * @param {bootstrap.Modal} modal - Instancia del modal
+     * @param {HTMLElement} modalEl - Elemento del DOM del modal
+     */
+    async function handleSendReport(modal, modalEl) {
+        const type = $('#reportType').val();
+        const message = $('#reportMessage').val();
+        const fileInput = $('#reportEvidence')[0];
+        const files = fileInput.files;
+
+        // Usar configuración fija
+        const subject = `${CONFIG.report.subjectPrefix}${type}`;
+
+        await Salem.utils.loading({ title: 'Enviando Reporte', message: 'Procesando envío de correo...' });
+
+        try {
+            // Obtener datos del usuario logueado para la firma
+            const storage = await Salem.core.mem.get();
+            const userData = storage.login; // Contiene usuario, area, correo, etc.
+
+            // Determinar saludo según la hora
+            const hour = new Date().getHours();
+            let greeting = 'Buen día';
+            if (hour >= 12 && hour < 18) greeting = 'Buenas tardes';
+            else if (hour >= 18 || hour < 5) greeting = 'Buenas noches';
+
+            // Preparar adjuntos (Array)
+            let attachments = [];
+            if (files.length > 0) {
+                for (let i = 0; i < files.length; i++) {
+                    const fileData = await readFileAsBase64(files[i]);
+                    attachments.push(fileData);
+                }
+            }
+
+            // Construir payload compatible con API Salem
+            const payload = {
+                action: 'report',
+                subaction: 'send',
+                subject: subject,
+                body: `
+                    <p>${greeting},</p>
+                    <p>${message}</p>
+                    <br>
+                    <p>Quedo atento a sus comentarios, muchas gracias.</p>
+                `,
+                attachments: attachments
+            };
+
+            const response = await Salem.core.api(payload);
+
+            if (response && response.done) {
+                Salem.utils.toast({ title: 'Éxito', message: 'Reporte enviado correctamente.', type: 'success' });
+                modal.hide();
+            } else {
+                Salem.utils.toast({ title: 'Error', message: 'No se pudo enviar el reporte.', type: 'error' });
+            }
+
+        } catch (error) {
+            console.error(error);
+            Salem.utils.toast({ title: 'Error', message: 'Ocurrió un error al enviar el reporte.', type: 'error' });
+        } finally {
+            await Salem.utils.loading();
+        }
+    }
+
+    /**
+     * Utilidad para convertir File a Base64.
+     * @param {File} file 
+     * @returns {Promise<Object>}
+     */
+    function readFileAsBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve({
+                name: file.name,
+                mimeType: file.type,
+                data: reader.result.split(',')[1] // Obtener base64 limpio
+            });
+            reader.onerror = error => reject(error);
+        });
+    }
+});

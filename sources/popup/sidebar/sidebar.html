@@ -47,16 +47,21 @@
                     <div class="collapse" id="reports-collapse">
                         <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                             <li>
-                                <a href="#" data-parent="Pendientes" data-sidebar-panel="downloadMpp"
+                                <a href="#" data-parent="Reportes" data-sidebar-panel="updateRutinarios"
                                     class="link-dark d-inline-flex text-decoration-none rounded">
-                                    <i class="fa-solid fa-file-excel"></i>Pend. preventivos</a>
-                                <a href="#" data-parent="Pendientes" data-sidebar-panel="downloadRut"
-                                    class="link-dark d-inline-flex text-decoration-none rounded">
-                                    <i class="fa-solid fa-file-excel"></i>Pend. rutinarios</a>
-                                <a href="#" data-parent="Pendientes" data-sidebar-panel="downloadRutinariosTDA"
-                                    class="link-dark d-inline-flex text-decoration-none rounded">
-                                    <i class="fa-solid fa-file-excel"></i>TDA Rutinarios</a>
+                                    <i class="fa-solid fa-folder-plus"></i>Programar Mtto Rutinarios</a>
                             </li>
+                            <li>
+                                <a href="#" data-parent="Reportes" data-sidebar-panel="updatePreventivos"
+                                    class="link-dark d-inline-flex text-decoration-none rounded">
+                                    <i class="fa-solid fa-folder-plus"></i>Verificar Mtto Preventivos</a>
+                            </li>
+                            <li>
+                                <a href="#" data-parent="Reportes" data-sidebar-panel="updateCheckRutinarios"
+                                    class="link-dark d-inline-flex text-decoration-none rounded">
+                                    <i class="fa-solid fa-folder-plus"></i>Verificar Mtto Rutinarios</a>
+                            </li>
+
                         </ul>
                     </div>
                 </li>
@@ -71,16 +76,6 @@
                                 <a href="#" data-parent="Utilidades" data-sidebar-panel="bulk"
                                     class="link-dark d-inline-flex text-decoration-none rounded">
                                     <i class="fa-solid fa-link"></i>Bulk</a>
-                            </li>
-                            <li>
-                                <a href="#" data-parent="Utilidades" data-sidebar-panel="updateRutinarios"
-                                    class="link-dark d-inline-flex text-decoration-none rounded">
-                                    <i class="fa-solid fa-folder-plus"></i>Programar Mtto Rutinarios</a>
-                            </li>
-                            <li>
-                                <a href="#" data-parent="Utilidades" data-sidebar-panel="updatePreventivos"
-                                    class="link-dark d-inline-flex text-decoration-none rounded">
-                                    <i class="fa-solid fa-folder-plus"></i>Verificar Mtto Preventivos</a>
                             </li>
                             <li>
                                 <a href="https://script.google.com/a/macros/rbsas.co/s/AKfycbxMr1ls_nxMLBwiSX8Pdj4_aZYgqa_ZbjA4SQVZcmAZHaNxq9etTU09JuydUGoPcYJSQQ/exec"
@@ -171,6 +166,8 @@
     <script src="/sources/vendor/js/sweetalert2@11.js"></script>
     <script src="/sources/vendor/js/ckeditor.js"></script>
     <script src="/sources/vendor/js/xlsx.full.min.js"></script>
+    <!-- ExcelJS: Librería moderna con soporte completo de estilos -->
+    <script src="/sources/vendor/js/exceljs.min.js"></script>
 
     <!-- Salem Module Script -->
     <script src="/sources/api/salem.js"></script>

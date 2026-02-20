@@ -1,13 +1,12 @@
 {
     "name": "Salem",
-    "version": "1.2.3.3",
+    "version": "1.2.3.5",
     "manifest_version": 3,
-    "description": "Salem, asistente para ayudar a optimizar la documentación de tickets de OTOBO en SOMI Estaciones.",
+    "description": "Automatización y gestión centralizada de mantenimientos preventivos y rutinarios de equipos en la plataforma Salem Estaciones.",
     "content_scripts": [
         {
             "matches": [
                 "https://helpdesk.rbsas.co/otobo/*",
-                "https://172.20.0.80/otobo/*",
                 "http://172.20.0.80/otobo/*"
             ],
             "js": [
@@ -41,21 +40,39 @@
     },
     "permissions": [
         "storage",
+        "unlimitedStorage",
         "tabs",
-        "contextMenus"
+        "contextMenus",
+        "alarms"
     ],
     "host_permissions": [
         "https://helpdesk.rbsas.co/*",
-        "https://172.20.0.80/*",
-        "http://172.20.0.80/*"
+        "http://172.20.0.80/*",
+        "https://script.google.com/*",
+        "https://script.googleusercontent.com/*",
+        "https://docs.google.com/*"
     ],
     "web_accessible_resources": [
         {
             "resources": [
-                "*"
+                "sources/popup/login/login.html",
+                "sources/popup/login/login.css",
+                "sources/popup/login/login.js",
+                "sources/client/css/salem.css",
+                "sources/client/modals/error/error.html",
+                "sources/client/modals/error/error.css",
+                "sources/client/modals/loading/loading.html",
+                "sources/client/modals/loading/loading.css",
+                "sources/vendor/js/jquery-3.6.1.min.js",
+                "sources/vendor/js/bootstrap.bundle.min.js",
+                "sources/vendor/js/crypto-js.min.js",
+                "sources/api/salem.js",
+                "icons/salem_48x48.png",
+                "icons/salem_512x512.png"
             ],
             "matches": [
-                "<all_urls>"
+                "https://helpdesk.rbsas.co/*",
+                "http://172.20.0.80/*"
             ]
         }
     ]

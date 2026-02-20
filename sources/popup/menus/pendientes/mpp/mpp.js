@@ -2,6 +2,12 @@ $(() => {
     let tipo = ''
     $('[name="plan"]').on('change', changePrevType)
     
+    /**
+     * @description Actualiza el asunto y el contenedor informativo del plan preventivo activo
+     * según la opción seleccionada en el menú desplegable.
+     *
+     * @returns {void}
+     */
     function changePrevType() {
         tipo = $(this).val()
         $('input[name="asunto"]').val(storage.config.planes.active[tipo])

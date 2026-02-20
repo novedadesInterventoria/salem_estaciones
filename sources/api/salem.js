@@ -1,4 +1,4 @@
-var Salem = {
+﻿var Salem = {
   otrs: {
     utils: {
       /**
@@ -81,6 +81,40 @@ var Salem = {
           moveForm.transform = "plain";
           await Salem.otrs.ajax(moveForm);
           resolve(true);
+        });
+      },
+      /**
+       * @description Verifica la existencia de tickets duplicados en OTOBO para un conjunto de equipos de forma secuencial.
+       *
+       * @param {Array<Object>} packageList - Lista de paquetes que contienen las propiedades cmdb y create de cada equipo.
+       * @param {Object} [customStorage] - Objeto de configuración en memoria con las reglas de búsqueda de duplicidad.
+       *
+       * @returns {Promise<Array<Object>>} Promesa que resuelve la lista de paquetes enriquecida con la propiedad hasDuplicity.
+       */
+      checkDuplicity: (packageList, customStorage) => {
+        return new Promise(async (resolve) => {
+          let storageObj = customStorage;
+          if (!storageObj && typeof storage !== "undefined") {
+            storageObj = storage;
+          }
+          if (!storageObj) {
+            storageObj = await Salem.core.mem.get();
+          }
+          let res = [];
+          for (let u of packageList) {
+            await Salem.utils.loading({
+              title: "Verificando duplicidad",
+              message: `Se está verificando duplicidad para el equipo ${u.cmdb.equipo} ${u.cmdb.name} de ${u.cmdb.estacion}`
+            });
+            let baseSearch = storageObj && storageObj.config && storageObj.config.utils && storageObj.config.utils.checkDuplicity;
+            let search = baseSearch ? { ...baseSearch } : {};
+            search.Search_DynamicField_IDEQUIPO = u.cmdb.name;
+            search.Title = `"${u.cmdb.asunto}"`;
+            search.ServiceIDs = [u.create.service_id];
+            let hasDuplicity = await Salem.otrs.ajax(search);
+            res.push({ ...u, hasDuplicity: hasDuplicity || [] });
+          }
+          resolve(res);
         });
       },
       predef: {
@@ -176,17 +210,89 @@ var Salem = {
             return form;
           },
           /**
+           * Completa los campos del formulario AgentTicketPhone6 para crear tickets
+           * de Centro de Control / Fiscalizador.
            *
-           * @param {JSON} form - Formulario de creación de ticket de Buses.
-           * @param {JSON} createFields - Campos para crear el ticket.
+           * Obligatorios en createFields: {...cmdb, asunto, cuerpo}
+           *   → name, equipo, estacion, ubicacion
            *
-           * Obligatorios: {Patio, 'ID Móvil', Placa, 'Tipo de Flota', asunto, cuerpo}
+           * Obligatorios en createParams: Registro CREATE de hoja CLOE para FISCALIZADOR
+           *   → requerimiento, type_id, service_id, sla_id, priority_id
            *
-           * Opcionales: {!customer: rbsas, !customerText: '"CLIENTE INTERNO  RECAUDO BOGOTA" <reportes@rbsas.co>',
-           * !padreId: '', !customerName: 'RB CLIENTE INTERNO', !zonaSirci: 'NO'  }
+           * Opcional en createFields: padre (TicketID del ticket padre)
            *
-           * @param {JSON} createParams - Parametros de CONS1
-           * @returns
+           * @param {JSON} form          - Formulario HTML de AgentTicketPhone6 parseado como JSON.
+           * @param {JSON} createFields  - Datos del equipo/CMDB (incluye asunto y cuerpo ya calculados).
+           * @param {JSON} createParams  - Parámetros del registro CREATE de CLOE para FISCALIZADOR.
+           * @returns {JSON}             - Formulario completado listo para enviar a Salem.otrs.ajax.
+           */
+          fiscalizador: (form, createFields, createParams) => {
+            // Enlace con ticket padre (opcional)
+            form.LinkTicketID = createFields.padre ? createFields.padre : "";
+            form.TicketID = createFields.padre ? createFields.padre : "";
+
+            // Datos del cliente — iguales al flujo de Estaciones
+            form.SelectedCustomerUser = "festacion";
+            form.CustomerSelected = "1";
+            form.CustomerKey_1 = "festacion";
+            form.CustomerTicketText_1 = '"FUNCIONARIO ESTACION RECAUDO BOGOTA" <control@rbsas.co>';
+            form.CustomerTicketCounterFromCustomer = "1";
+            form.CustomerID = "RB CLIENTE INTERNO";
+
+            // Cola destino
+            form.Dest = "22||RB::MESA DE SERVICIOS";
+
+            // ── Campos específicos de Centro de Control / Fiscalizador ──────────
+            // Equipo: campo propio del formulario AgentTicketPhone6
+            form.DynamicField_EQUIPOCC = createFields.equipo;
+
+            // Categoría correcta para Centro de Control (≠ "EQUIPO ESTACIONES")
+            form.DynamicField_CATEGORIATICKET = "CENTRO DE CONTROL T.M S.A";
+
+            // Requerimiento desde CREATE
+            form.DynamicField_REQUERIMIENTOSOPORTE = createParams.requerimiento;
+
+            // Ubicación/estación: campo propio de AgentTicketPhone6
+            form.DynamicField_UBICACIONEQUIPOCC = createFields.estacion;
+
+            // ID del equipo (campo compartido con otros formularios de OTOBO)
+            form.DropIDEquipo = createFields.name;
+            form.DynamicField_IDEQUIPO = createFields.name;
+            // ────────────────────────────────────────────────────────────────────
+
+            // Parámetros de servicio — vienen exclusivamente de CREATE (hoja CLOE)
+            form.TypeID = createParams.type_id;
+            form.ServiceID = createParams.service_id;
+            form.SLAID = createParams.sla_id;
+            form.PriorityID = createParams.priority_id;
+
+            // Estado inicial explícito → 34 = NUEVO
+            // Se establece aquí para no depender del valor por defecto del HTML del formulario
+            form.NextStateID = "34";
+
+            // Asunto y cuerpo calculados en fiscalizadores.js antes de llamar esta función
+            form.Subject = createFields.asunto;
+            form.Body = createFields.cuerpo.replaceAll("\n", "<br/>");
+
+            // Campos de control Salem
+            form.Cargado = "1";
+            form.transform = "info";
+
+            // Si el llamador envió campos originales, sobrescribir al final
+            if (createFields.original)
+              form = { ...form, ...createFields.original };
+
+            return form;
+          },
+          /**
+           * @description Completa los campos del formulario de creación de tickets para flota/móviles.
+           *
+           * @param {Object} form         - Formulario base de OTOBO serializado.
+           * @param {Object} createFields - Campos calculados del equipo y del móvil.
+           * @param {Object} createParams - Parámetros de servicio y prioridad desde la hoja CLOE.
+           * @param {Object} storage      - Almacenamiento local con configuración y sesión activa.
+           *
+           * @returns {Object} Formulario enriquecido listo para enviar a OTOBO.
            */
           flota: (form, createFields, createParams, storage) => {
             // Opcionales
@@ -476,6 +582,15 @@ var Salem = {
         resolve(flag);
       });
     },
+    /**
+     * @description Envía una solicitud AJAX autenticada hacia la API de OTOBO incluyendo el ChallengeToken.
+     * Soporta transformación automática de respuesta a DOM sanitizado, formulario o JSON.
+     *
+     * @param {Object} payload       - Parámetros y acciones de OTOBO (Action, TicketID, etc.).
+     * @param {string} [token]       - ChallengeToken explícito opcional.
+     *
+     * @returns {Promise<any>} Respuesta procesada de OTOBO o null si falla la autenticación.
+     */
     ajax: (payload, token) => {
       return new Promise(async (resolve) => {
         info =
@@ -496,14 +611,27 @@ var Salem = {
           type: payload.type ? payload.type : "POST",
           data: params,
           success: (res) => {
-            let result = payload.transform
-              ? Salem.utils.parse[payload.transform](res)
+            let processed = (typeof res === "string" && (payload.transform === "dom" || payload.transform === "form" || payload.transform === "info"))
+              ? Salem.utils.cleanCspHtml(res)
               : res;
+            let result = payload.transform
+              ? Salem.utils.parse[payload.transform](processed)
+              : processed;
             resolve(result);
           },
         });
       });
     },
+    /**
+     * @description Adjunta uno o varios archivos a un formulario abierto de OTOBO vía AjaxAttachment.
+     *
+     * @param {Array<File>} files - Lista de archivos a subir.
+     * @param {Object}      form  - Formulario que contiene FormID y ChallengeToken.
+     * @param {string|Array<Object>} name - Nombre(s) a asignar a los archivos subidos.
+     *
+     * @returns {Promise<Object>} Respuesta del servidor OTOBO tras la carga.
+     * @throws {Error} Si la solicitud AJAX de subida falla.
+     */
     attach: (files, form, name) => {
       return new Promise((resolve, reject) => {
         Salem.utils.loading({
@@ -541,17 +669,64 @@ var Salem = {
       });
     },
     events: {
+      /**
+       * @description Sincroniza el historial y eventos del ticket consultando las notas y artículos en OTOBO.
+       *
+       * @param {Object|string} info - Datos del ticket o número de ticket.
+       *
+       * @returns {Promise<Array<Object>>} Lista de eventos y notas del ticket.
+       */
       sync: (info) => {
         return new Promise(async (resolve) => {
-          let res = await Salem.otrs.ajax({
-            ShownAttributes: "LabelTicketNumber",
-            TicketNumber: info.ticket,
-            Action: "AgentTicketSearch",
-            Subaction: "Search",
-            ResultForm: "CSV",
-            transform: "csv",
-          });
-          resolve(res);
+          let ticketNum = "";
+          let ticketId = "";
+          if (typeof info === "object" && info !== null) {
+            ticketNum = info.ticket || info.TicketNumber || info["Ticket Número"] || "";
+            ticketId = info.id || info.TicketID || "";
+          } else if (typeof info === "string") {
+            ticketNum = info;
+          }
+
+          let res = [];
+          if (ticketNum || ticketId) {
+            let searchPayload = {
+              Action: "AgentTicketSearch",
+              Subaction: "Search",
+              ResultForm: "CSV",
+              transform: "csv"
+            };
+            if (ticketNum) {
+              searchPayload.TicketNumber = ticketNum;
+            }
+            if (ticketId) {
+              searchPayload.TicketID = ticketId;
+            }
+            res = await Salem.otrs.ajax(searchPayload);
+          }
+
+          // Fallback automático: si CSV viene vacío (0 resultados), leer desde DOM
+          if (!res || !Array.isArray(res) || res.length === 0) {
+            try {
+              let domInfo = await Salem.core.runtime.getInfo();
+              if (domInfo && (domInfo.ticket || domInfo.id)) {
+                res = [{
+                  "Ticket Número": domInfo.ticket || ticketNum || "",
+                  "Estado": domInfo.Estado || "",
+                  "Servicio": domInfo.Servicio || "",
+                  "Cola": domInfo.Cola || "",
+                  "¿Quién Gestiona?": domInfo["¿Quién Gestiona?"] || "",
+                  "ID Equipo": domInfo["ID Equipo"] || "",
+                  "Estación": domInfo["Estación"] || "",
+                  "Asunto": domInfo.rotulo || domInfo.titulo || "",
+                  ...domInfo
+                }];
+              }
+            } catch (domErr) {
+              console.warn("Salem :: Fallback DOM en sync error:", domErr);
+            }
+          }
+
+          resolve(res || []);
         });
       },
       /**
@@ -628,24 +803,47 @@ var Salem = {
     },
   },
   core: {
+    /**
+     * @description Envía un mensaje desde la ventana emergente/sidebar hacia la pestaña activa de OTOBO.
+     *
+     * @param {Object} message - Mensaje con la acción y parámetros requeridos.
+     *
+     * @returns {Promise<any>} Respuesta resuelta por el listener de la pestaña.
+     */
     emit: (message) => {
       return new Promise((resolve) => {
+        if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) {
+          console.error("[SALEM][EMIT] chrome.runtime no disponible");
+          resolve(undefined);
+          return;
+        }
         let searchParams = window.location.search;
         let query = new URLSearchParams(searchParams);
         let tabId = parseInt(query.get("tabId"));
-        chrome.tabs.sendMessage(tabId, message, (res) => {
-          let lastError = chrome.runtime.lastError;
-          if (lastError) {
-            console.log(lastError.message);
+        if (tabId && !isNaN(tabId)) {
+          chrome.tabs.sendMessage(tabId, message, (res) => {
+            let lastError = chrome.runtime.lastError;
+            if (lastError) {
+              console.error(`[SALEM][EMIT] Error enviando mensaje al tabId ${tabId}:`, lastError.message);
+              resolve(undefined);
+              return;
+            }
             resolve(res);
-            return;
-          }
-          resolve(res);
-        });
+          });
+        } else {
+          console.error("[SALEM][EMIT] No se encontró un tabId válido en la URL para dirigir la operación. No se usará fallback a activeTab.");
+          resolve(undefined);
+        }
       });
     },
+    /**
+     * @description Inicializa la escucha de eventos y mensajes en el contexto de la pestaña de OTOBO.
+     * Verifica la sesión del usuario, sincronización periódica y disparadores MRA en tiempo real.
+     *
+     * @returns {Promise<void>}
+     */
     listen: async () => {
-      console.log("Salem runtime listening is up.");
+      console.log("%c[Salem] listen() iniciado en:", "color:#6f42c1;font-weight:bold", window.location.href);
       let storage = await Salem.core.mem.get();
       let ahora = Date.now();
 
@@ -667,10 +865,113 @@ var Salem = {
           return true;
         });
 
+        // Función auxiliar para calcular la firma de datos relevantes del ticket
+        /**
+         * @description Genera un hash/firma textual de los campos críticos del ticket para detectar cambios de estado.
+         *
+         * @param {Object} info - Información del ticket activo.
+         *
+         * @returns {string} Firma concatenada del ticket.
+         */
+        function getTicketSignature(info) {
+          if (!info || !info.ticket) return "";
+          return [
+            info.ticket,
+            info.Estado || "",
+            info.first_prog || "",
+            info.last_prog || "",
+            info.resuelto || "",
+            info.anulado || "",
+            (info.partes ? info.partes.length : 0),
+            info["¿Quién Gestiona?"] || "",
+            info.Cola || "",
+            info.Servicio || "",
+            info.Prioridad || ""
+          ].join("|");
+        }
+
+        let lastMraSignature = "";
         let info = await Salem.core.runtime.getInfo();
         if (info && info.isZoom) {
+          lastMraSignature = getTicketSignature(info);
           Salem.core.runtime.mra(storage, info);
         }
+
+        // --- Detección en tiempo real de acciones directas en OTOBO ---
+        let updateTimer = null;
+        let lastExecutionTime = 0;
+        const MIN_INTERVAL = 3000; // Throttle: mínimo 3s entre ejecuciones de MRA
+
+        /**
+         * @description Programa una verificación diferida y con limitación de frecuencia (throttle)
+         * para registrar actualizaciones directas en OTOBO hacia la hoja MRA.
+         *
+         * @param {string} source       - Origen o descripción del evento desencadenante.
+         * @param {number} [delay=1500] - Tiempo de espera en milisegundos para el debounce.
+         *
+         * @returns {void}
+         */
+        function scheduleOtoboUpdate(source, delay = 1500) {
+          if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) {
+            return;
+          }
+          if (updateTimer) {
+            clearTimeout(updateTimer);
+          }
+          updateTimer = setTimeout(async () => {
+            updateTimer = null;
+            if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.id) {
+              return;
+            }
+            let now = Date.now();
+            if (now - lastExecutionTime < MIN_INTERVAL) {
+              return;
+            }
+            try {
+              let storage = await Salem.core.mem.get();
+              if (!storage || !storage.login || !storage.config || !storage.config.mra) {
+                return;
+              }
+              // Leer SIEMPRE la información real y fresca del DOM de OTOBO
+              let info = await Salem.core.runtime.getInfo();
+              if (info && info.isZoom) {
+                let currentSignature = getTicketSignature(info);
+                // Si la firma cambió o si fue un submit/click explícito, disparar MRA
+                if (currentSignature !== lastMraSignature || source === "submit" || source === "click") {
+                  lastMraSignature = currentSignature;
+                  lastExecutionTime = Date.now();
+                  await Salem.core.runtime.mra(storage, info);
+                }
+              }
+            } catch (err) {
+              // Silencioso
+            }
+          }, delay);
+        }
+
+        // 1. Detección de envíos de formularios OTOBO (sin preventDefault)
+        $(document).on("submit", "form", () => {
+          scheduleOtoboUpdate("submit", 1500);
+        });
+
+        // 2. Detección de clicks en botones de acción o envío de ticket
+        $(document).on(
+          "click",
+          "#submitRichText, #Submit, button[type='submit'], input[type='submit'], .CallForAction",
+          () => {
+            scheduleOtoboUpdate("click", 1500);
+          }
+        );
+
+        // 3. Mecanismo de recuperación ante retorno de foco/visibilidad
+        window.addEventListener("focus", () => {
+          scheduleOtoboUpdate("focus", 1000);
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") {
+            scheduleOtoboUpdate("visibility", 1000);
+          }
+        });
       }
 
       // Agregar escuchadores y utilidades
@@ -678,94 +979,58 @@ var Salem = {
         Salem.core.runtime.zoomTicket($(e.currentTarget).text())
       );
 
-      // Iniciar actualización automática de tickets calientes
-      Salem.core.iniciarAutoActualizacionTicketsCalientes()
+
 
 
 
     },
+    /**
+     * @description Comprueba si ha vencido el período de sincronización y dispara la actualización automática.
+     *
+     * @param {Object} storage - Almacenamiento local con timestamp syncDate.
+     *
+     * @returns {Promise<void>}
+     */
     checkSync: async (storage) => {
       let ahora = Date.now();
       if (storage && storage.syncDate && ahora >= storage.syncDate)
         Salem.core.runtime.sync();
     },
 
-    /**
-     * Actualiza automáticamente los tickets calientes desde OTOBO
-     * Función que actualiza automáticamente los tickets calientes cada 5 minutos
-     */
-    autoActualizarTicketsCalientes: async function () {
-      try {
-        let storage = await Salem.core.mem.get()
-
-        // Verificar que existe la sesión y la configuración
-        if (!storage || !storage.config || !storage.config.abiertosEstaciones) {
-          console.error("Salem Flota :: Configuración no disponible")
-          return
-        }
-
-        // Obtener configuración desde el archivo JSON externo
-        let config = storage.config.abiertosEstaciones
-
-        // Realizar la consulta a OTOBO con el query configurado
-        let ticketsData = await Salem.otrs.ajax(config.query)
-
-        // Mapear los datos según los headers configurados
-        let mappedData = ticketsData.map((u) => {
-          let registro = {}
-          config.headers.forEach((key) => {
-            registro[key] = u[key];
-          })
-          return registro
-        })
-
-        // Enviar los datos al API de Google Apps Script
-        if (mappedData && mappedData.length > 0) {
-          await Salem.core.api({
-            action: "ticketsCalienteEstaciones",
-            subaction: "open",
-            data: mappedData
-          })
-        }
-      } catch (error) {
-        console.error("Salem Flota :: Error en actualización automática de tickets calientes:", error)
-      }
-    },
-    /**
-     * Inicia la actualización automática de tickets calientes cada 5 minutos
-     */
-    iniciarAutoActualizacionTicketsCalientes: function () {
-      // Intervalo de actualización: 3 minutos (180000 ms)
-      const INTERVALO_ACTUALIZACION = 180000// 3 minutos
-
-
-      Salem.core.autoActualizarTicketsCalientes()
-
-      // Configurar el intervalo para ejecuciones posteriores
-      if (!Salem.temp) {
-        Salem.temp = {}
-      }
-
-      // Limpiar intervalo anterior si existe
-      if (Salem.temp.intervalTicketsCalientes) {
-        clearInterval(Salem.temp.intervalTicketsCalientes)
-      }
-
-      Salem.temp.intervalTicketsCalientes = setInterval(() => {
-        Salem.core.autoActualizarTicketsCalientes()
-      }, INTERVALO_ACTUALIZACION)
-    },
     runtime: {
+      /**
+       * @description Enruta y envía los datos del ticket activo hacia la hoja de auditoría MRA en Google Sheets.
+       *
+       * @param {Object} storage - Almacenamiento con configuración y sesión.
+       * @param {Object} info    - Datos del ticket inspeccionado en OTOBO Zoom.
+       *
+       * @returns {Promise<void>}
+       */
       mra: async (storage, info) => {
         storage =
           storage && storage.config ? storage : await Salem.core.mem.get();
         info = info && info.isZoom ? info : await Salem.core.runtime.getInfo();
+
+        // Fallback de alias para Fiscalizadores / Centro de Control
+        if (info) {
+          if (!info["Estación"] && (info["Centro de Control"] || info["Ubicación Centro de Control"] || info["Ubicación Equipo Centro de Control"] || info["Ubicación Equipo CC"])) {
+            info["Estación"] = info["Centro de Control"] || info["Ubicación Centro de Control"] || info["Ubicación Equipo Centro de Control"] || info["Ubicación Equipo CC"];
+          }
+          if (!info["Equipo Estación"] && (info["Equipo Centro de Control"] || info["Equipo CC"] || info["Equipo"])) {
+            info["Equipo Estación"] = info["Equipo Centro de Control"] || info["Equipo CC"] || info["Equipo"];
+          }
+          if (!info["ID Equipo"] && (info["ID Móvil"] || info["ID Equipo Centro de Control"] || info["ID Equipo CC"] || info["ID"])) {
+            info["ID Equipo"] = info["ID Móvil"] || info["ID Equipo Centro de Control"] || info["ID Equipo CC"] || info["ID"];
+          }
+        }
+
         let package = [];
         for (let key of Object.keys(storage.config.mra)) {
           let regla = storage.config.mra[key];
           counter = 0;
           regla.verificaciones.forEach((criterio) => {
-            if (info[criterio.campo]) {
+            let valorEnInfo = info[criterio.campo];
+            if (valorEnInfo) {
               let flag = false;
               criterio.ref
                 ? (criterio.valor = Salem.utils.getValueByRef(
@@ -786,16 +1051,25 @@ var Salem = {
                       ? true
                       : false;
                   break;
-                case "includes":
-                  flag = info[criterio.campo].includes(criterio.valor)
-                    ? true
-                    : false;
+                case "includes": {
+                  let vA = String(info[criterio.campo] || "").trim();
+                  let vB = String(criterio.valor || "").trim();
+                  flag =
+                    vA.includes(vB) ||
+                    vA.replace(/\s*-\s*/g, "-").includes(vB.replace(/\s*-\s*/g, "-")) ||
+                    vA.replace(/\s+/g, " ").includes(vB.replace(/\s+/g, " "));
                   break;
-                case "no_includes":
-                  flag = !info[criterio.campo].includes(criterio.valor)
-                    ? true
-                    : false;
+                }
+                case "no_includes": {
+                  let vA = String(info[criterio.campo] || "").trim();
+                  let vB = String(criterio.valor || "").trim();
+                  flag = !(
+                    vA.includes(vB) ||
+                    vA.replace(/\s*-\s*/g, "-").includes(vB.replace(/\s*-\s*/g, "-")) ||
+                    vA.replace(/\s+/g, " ").includes(vB.replace(/\s+/g, " "))
+                  );
                   break;
+                }
                 case "typeof":
                   flag =
                     typeof info[criterio.campo] == criterio.valor
@@ -808,20 +1082,55 @@ var Salem = {
           });
           if (counter == regla.verificaciones.length) {
             regla.ajax ? package.push(regla.ajax) : null;
-            regla.show ? await Salem.utils.toast(regla.show) : null; // Esperar por acción si es swal.
+            regla.show ? await Salem.utils.toast(regla.show) : null;
           }
         }
         if (package.length != 0) {
-          // Llamada a API sin espera
-          Salem.core.api({
-            action: "runtime",
-            subaction: "mra",
-            package,
-            otrs: info,
-            config: storage.config.planes,
-          });
+          console.log(
+            `[SALEM][MRA][DELEGATED] Delegando evento a SW para ticket ${info.ticket || info.id || "desconocido"}`
+          );
+          if (
+            typeof chrome !== "undefined" &&
+            chrome.runtime &&
+            chrome.runtime.sendMessage
+          ) {
+            chrome.runtime.sendMessage(
+              {
+                type: "SALEM_MRA",
+                payload: {
+                  package,
+                  otrs: info,
+                  config: storage.config.planes,
+                },
+              },
+              (res) => {
+                let err = chrome.runtime.lastError;
+                if (err || !res || !res.received) {
+                  console.error(
+                    `[SALEM][MRA][SEND_FAILED] Error delegando MRA al SW:`,
+                    err || res
+                  );
+                } else {
+                  console.log(
+                    `[SALEM][MRA][ACK] Evento persistido por SW: eventId=${res.eventId}, tabId=${res.tabId}`
+                  );
+                }
+              }
+            );
+          } else {
+            console.error(
+              `[SALEM][MRA][SEND_FAILED] chrome.runtime.sendMessage no disponible`
+            );
+          }
         }
       },
+      /**
+       * @description Abre la vista de detalle (AgentTicketZoom) de un ticket en una nueva pestaña del navegador.
+       *
+       * @param {string|number} TicketNumber - Número del ticket a visualizar.
+       *
+       * @returns {void}
+       */
       zoomTicket: (TicketNumber) => {
         window.open(
           Salem.rules.routes.otrs +
@@ -837,8 +1146,154 @@ var Salem = {
        * @returns
        */
 
+      ////Traza creaciòn de tickets Fiscalizadores / Centro de Control/////
+
+      /**
+       * Realiza la traza de estados para Fiscalizadores / Centro de Control:
+       * 1. NUEVO -> ASIGNADO A CAMPO usando AgentTicketPriority5 (incluyendo cambio de cola vía NewQueueID)
+       * 2. ASIGNADO A CAMPO -> PROGRESO MTTO PREVENTIVO usando AgentTicketNote (si el destino es PROGRESO)
+       * @param {JSON} info - Objeto JSON con los datos del ticket nuevo
+       * @param {JSON} params - Parámetros de la traza: {firma, destino, nota, tcampo, hora}
+       * @returns {Promise<Boolean>}
+       */
+      sweepFiscalizadores: (info, params) => {
+        return new Promise(async (resolve) => {
+          await Salem.utils.loading({
+            title: "Realizando traza",
+            message: "Se está ejecutando la traza de estados para Fiscalizador",
+          });
+
+          let storage = await Salem.core.mem.get();
+          let cat =
+            info["Categoría del Ticket"] &&
+            info["Categoría del Ticket"].toLowerCase().includes("flota")
+              ? "buses"
+              : "no_buses";
+          if (params.hora == "") params.hora = moment().format("HH:mm");
+
+          // 1. Transición: NUEVO -> ASIGNADO A CAMPO usando AgentTicketPriority5
+          let priorityForm = await Salem.otrs.ajax({
+            type: "GET",
+            transform: "form",
+            Action: "AgentTicketPriority5",
+            TicketID: info.id,
+          });
+
+          let notaAsignado =
+            storage &&
+            storage.config &&
+            storage.config.sweep &&
+            storage.config.sweep[cat] &&
+            storage.config.sweep[cat].notas
+              ? storage.config.sweep[cat].notas["ASIGNADO A CAMPO"]
+              : null;
+
+          if (priorityForm) {
+            priorityForm.NewStateID =
+              notaAsignado?.status_code || priorityForm.NewStateID;
+            priorityForm.Subject =
+              params.tcampo && notaAsignado
+                ? notaAsignado.asunto
+                    .replaceAll("$firma", storage.login.firma)
+                    .replaceAll("$hora", params.hora)
+                : (notaAsignado?.asunto || "ASIGNADO A CAMPO");
+            priorityForm.Body =
+              params.tcampo && notaAsignado
+                ? notaAsignado.texto.replaceAll("$tcampo", params.tcampo)
+                : (notaAsignado?.texto || "CAMBIO DE ESTADO");
+            priorityForm.DynamicField_SEGUIMIENTO = storage.login.firma;
+            priorityForm.DynamicField_QUIENGESTIONA = params.tcampo
+              ? params.tcampo
+              : storage.login.firma;
+            priorityForm.DynamicField_INTERVENCION = "SI";
+
+            // Modificar cola a MANTENIMIENTO PREVENTIVO usando NewQueueID si está disponible
+            if (storage?.config?.queues?.list?.["MANTENIMIENTO PREVENTIVO"]) {
+              priorityForm.NewQueueID =
+                storage.config.queues.list["MANTENIMIENTO PREVENTIVO"];
+            }
+
+            if (params.tcampo) priorityForm.IsVisibleForCustomer = "on";
+
+            await Salem.otrs.ajax({ transform: "form", ...priorityForm });
+          }
+
+          // Si el destino era solo ASIGNADO A CAMPO, verificar estado y resolver
+          if (params.destino === "ASIGNADO A CAMPO") {
+            let result = await Salem.otrs.middleware(
+              { isState: "ASIGNADO A CAMPO" },
+              info
+            );
+            resolve(result);
+            return;
+          }
+
+          // 2. Transición: ASIGNADO A CAMPO -> PROGRESO MTTO PREVENTIVO usando AgentTicketNote
+          if (params.destino === "PROGRESO MTTO PREVENTIVO") {
+            let noteForm = await Salem.otrs.ajax({
+              type: "GET",
+              transform: "form",
+              Action: "AgentTicketNote",
+              TicketID: info.id,
+            });
+
+            let notaProgreso =
+              storage &&
+              storage.config &&
+              storage.config.sweep &&
+              storage.config.sweep[cat] &&
+              storage.config.sweep[cat].notas
+                ? storage.config.sweep[cat].notas["PROGRESO MTTO PREVENTIVO"]
+                : null;
+
+            if (noteForm) {
+              noteForm.NewStateID =
+                notaProgreso?.status_code || noteForm.NewStateID;
+              noteForm.Subject =
+                params.tcampo && notaProgreso
+                  ? notaProgreso.asunto
+                      .replaceAll("$firma", storage.login.firma)
+                      .replaceAll("$hora", params.hora)
+                  : (notaProgreso?.asunto || "PROGRESO MTTO PREVENTIVO");
+              noteForm.Body = params.nota
+                ? params.nota
+                : params.tcampo && notaProgreso
+                  ? notaProgreso.texto.replaceAll("$tcampo", params.tcampo)
+                  : (notaProgreso?.texto || "PROGRESO MTTO PREVENTIVO");
+              noteForm.DynamicField_QUIENGESTIONA = params.tcampo
+                ? params.tcampo
+                : storage.login.firma;
+              noteForm.DynamicField_SEGUIMIENTO = storage.login.firma;
+              noteForm.DynamicField_INTERVENCION = "SI";
+              noteForm.DynamicField_MOTIVONOINTERVENCION = "-";
+              noteForm.DynamicField_DESCRIPCION = "-";
+              noteForm.IsVisibleForCustomer = "on";
+
+              await Salem.otrs.ajax({ transform: "form", ...noteForm });
+            }
+
+            let result = await Salem.otrs.middleware(
+              { isState: "PROGRESO MTTO PREVENTIVO" },
+              info
+            );
+            resolve(result);
+            return;
+          }
+
+          resolve(true);
+        });
+      },
+
       ////Traza creaciòn de tickets/////
 
+      /**
+       * @description Ejecuta la traza de estados inicial tras la creación de un ticket en OTOBO.
+       *
+       * @param {Object} info   - Información del ticket recién creado.
+       * @param {Object} params - Parámetros de transición (firma, destino, nota, tcampo, hora).
+       *
+       * @returns {Promise<boolean>} Verdadero si la traza se completó exitosamente.
+       */
       sweepCreate: (info, params) => {
         return new Promise(async (resolve) => {
           await Salem.utils.loading({
@@ -874,33 +1329,57 @@ var Salem = {
               message: `Se está realizando el envío de nota para estado ${jumps.cross[i]}`,
             });
             let nota = storage.config.sweep[cat].notas[jumps.cross[i]];
-            form.Body =
+            let isProgreso =
+              jumps.cross[i] == "PROGRESO MTTO PREVENTIVO" ||
+              (nota && nota.status_code == "36");
+
+            let targetForm = form;
+            if (isProgreso) {
+              let noteForm = await Salem.otrs.ajax({
+                type: "GET",
+                transform: "form",
+                Action: "AgentTicketNote",
+                TicketID: info.id,
+              });
+              if (noteForm) targetForm = noteForm;
+            }
+
+            targetForm.Body =
               params.nota && jumps.cross[i] == params.destino
                 ? params.nota
                 : params.tcampo
                   ? nota.texto.replaceAll("$tcampo", params.tcampo)
                   : "CAMBIO DE ESTADO";
-            form.Subject = params.tcampo
+            targetForm.Subject = params.tcampo
               ? nota.asunto
-                .replaceAll("$firma", storage.login.firma)
-                .replaceAll("$hora", params.hora)
+                  .replaceAll("$firma", storage.login.firma)
+                  .replaceAll("$hora", params.hora)
               : "CAMBIO DE ESTADO";
-            form.NewStateID = nota.status_code;
-            form.DynamicField_SEGUIMIENTO = storage.login.firma;
-            form.DynamicField_ = params.tcampo;
-            form.SLAID = 11;
+            targetForm.NewStateID = nota ? nota.status_code : (isProgreso ? "36" : targetForm.NewStateID);
+            targetForm.DynamicField_QUIENGESTIONA = params.tcampo
+              ? params.tcampo
+              : storage.login.firma;
+            targetForm.DynamicField_SEGUIMIENTO = storage.login.firma;
+            targetForm.DynamicField_INTERVENCION = "SI";
 
-            // Poner cambio de técnico si es que el estado actual es igual al destino.
-            form.Subject =
-              info.Estado == params.destino
-                ? `CAMBIO DE TÉCNICO`
-                : form.Subject;
+            if (isProgreso) {
+              targetForm.DynamicField_MOTIVONOINTERVENCION = "-";
+              targetForm.DynamicField_DESCRIPCION = "-";
+              targetForm.IsVisibleForCustomer = "on";
+            } else {
+              targetForm.SLAID = 11;
+              // Poner cambio de técnico si es que el estado actual es igual al destino.
+              targetForm.Subject =
+                info.Estado == params.destino
+                  ? `CAMBIO DE TÉCNICO`
+                  : targetForm.Subject;
 
-            // Definir si es nota externa
-            params.tcampo ? (form.IsVisibleForCustomer = "on") : null;
+              // Definir si es nota externa
+              params.tcampo ? (targetForm.IsVisibleForCustomer = "on") : null;
+            }
 
             // Enviar info a OTOBO
-            await Salem.otrs.ajax({ transform: "form", ...form });
+            await Salem.otrs.ajax({ transform: "form", ...targetForm });
 
             // Cortar ejecución si el estado enviado corresponde al destino
             if (jumps.cross[i] == params.destino) break;
@@ -912,13 +1391,19 @@ var Salem = {
             info
           );
           resolve(result);
-
-
         });
       },
 
       ////Traza de estados Preventivos y rutinarios normales/////
 
+      /**
+       * @description Ejecuta la traza estándar de cambio de estados para preventivos y rutinarios.
+       *
+       * @param {Object} info   - Información del ticket en proceso.
+       * @param {Object} params - Parámetros de la transición de estado.
+       *
+       * @returns {Promise<boolean>} Verdadero si la transición de estados fue validada.
+       */
       sweep: (info, params) => {
         return new Promise(async (resolve) => {
           await Salem.utils.loading({
@@ -954,6 +1439,10 @@ var Salem = {
               message: `Se está realizando el envío de nota para estado ${jumps.cross[i]}`,
             });
             let nota = storage.config.sweep[cat].notas[jumps.cross[i]];
+            let isProgreso =
+              jumps.cross[i] == "PROGRESO MTTO PREVENTIVO" ||
+              (nota && nota.status_code == "36");
+
             form.Body =
               params.nota && jumps.cross[i] == params.destino
                 ? params.nota
@@ -962,27 +1451,32 @@ var Salem = {
                   : "CAMBIO DE ESTADO";
             form.Subject = params.tcampo
               ? nota.asunto
-                .replaceAll("$firma", storage.login.firma)
-                .replaceAll("$hora", params.hora)
+                  .replaceAll("$firma", storage.login.firma)
+                  .replaceAll("$hora", params.hora)
               : "CAMBIO DE ESTADO";
-            form.NewStateID = nota.status_code;
+            form.NewStateID = nota ? nota.status_code : (isProgreso ? "36" : form.NewStateID);
             form.DynamicField_QUIENGESTIONA = params.tcampo
               ? params.tcampo
               : storage.login.firma;
             form.DynamicField_SEGUIMIENTO = storage.login.firma;
             form.DynamicField_INTERVENCION = "SI";
 
-            // Poner cambio de técnico si es que el estado actual es igual al destino.
-            form.Subject =
-              info.Estado == params.destino
-                ? `CAMBIO DE TÉCNICO`
-                : form.Subject;
+            if (isProgreso) {
+              form.DynamicField_MOTIVONOINTERVENCION = "-";
+              form.DynamicField_DESCRIPCION = "-";
+              form.IsVisibleForCustomer = "on";
+            } else {
+              // Poner cambio de técnico si es que el estado actual es igual al destino.
+              form.Subject =
+                info.Estado == params.destino
+                  ? `CAMBIO DE TÉCNICO`
+                  : form.Subject;
 
-            // Definir si es nota externa
-            params.tcampo ? (form.IsVisibleForCustomer = "on") : null;
+              // Definir si es nota externa
+              params.tcampo ? (form.IsVisibleForCustomer = "on") : null;
+            }
 
             // Enviar info a OTOBO
-
             await Salem.otrs.ajax({ transform: "form", ...form });
 
             // Cortar ejecución si el estado enviado corresponde al destino
@@ -998,6 +1492,14 @@ var Salem = {
           //params.redirect ? Salem.emit({ action: otrs.redirect }) : null
         });
       },
+      /**
+       * @description Ejecuta la traza de estados especializada para mantenimientos especiales.
+       *
+       * @param {Object} info   - Información del ticket.
+       * @param {Object} params - Parámetros de transición específicos.
+       *
+       * @returns {Promise<boolean>} Verdadero si la traza de estados especiales culminó con éxito.
+       */
       sweepMttoEspeciales: (info, params) => {
         return new Promise(async (resolve) => {
           await Salem.utils.loading({
@@ -1077,6 +1579,11 @@ var Salem = {
           //params.redirect ? Salem.emit({ action: otrs.redirect }) : null
         });
       },
+      /**
+       * @description Recarga la ventana activa de OTOBO o emite la orden de recarga si se invoca desde el popup.
+       *
+       * @returns {Promise<void>}
+       */
       reload: () => {
         return new Promise(async (resolve) => {
           if (Salem.utils.checker.isOTRS()) {
@@ -1093,13 +1600,29 @@ var Salem = {
           }
         });
       },
+      /**
+       * @description Extrae la información estructurada del ticket y de los campos dinámicos de la página activa de OTOBO.
+       *
+       * @param {Object} [req] - Objeto opcional con selector o DOM específico a analizar.
+       *
+       * @returns {Promise<Object>} Diccionario con los valores de los campos del ticket.
+       */
       getInfo: (req) => {
         return new Promise(async (resolve, reject) => {
           try {
             let url = window.location.href;
             if (url.includes("/otobo/index.pl") || (req && typeof req.dom != "undefined")) {
               let campos = {};
-              if (req && req.dom) req.dom = $(req.dom);
+              if (req && req.dom) {
+                if (typeof req.dom === "string") {
+                  let clean = Salem.utils.cleanCspHtml(req.dom);
+                  let parser = new DOMParser();
+                  let doc = parser.parseFromString(clean, "text/html");
+                  req.dom = $(doc.body);
+                } else {
+                  req.dom = $(req.dom);
+                }
+              }
 
               // Obtener datos del formulario
               let form = req && req.dom ? req.dom.find("form").serializeArray() : $("form").serializeArray();
@@ -1113,10 +1636,18 @@ var Salem = {
 
               // Obtener campos específicos como ticket, id y token
               campos.ticket = (() => {
+                let ticketNum = req && req.dom
+                  ? req.dom.find('#TicketNumber, input[name="TicketNumber"]').val()
+                  : $('#TicketNumber, input[name="TicketNumber"]').val();
+                if (ticketNum) return ticketNum.trim();
+
                 let headlineText = req && req.dom
                   ? req.dom.find(".Headline").text()
                   : $(".Headline").text();
-                let parts = headlineText.split("—");
+                let match = headlineText.match(/(?:Ticket#|#\s*)(\d+)/i);
+                if (match) return match[1].trim();
+
+                let parts = headlineText.split(/[-—–]/);
                 if (parts.length > 0) {
                   let ticketPart = parts[0].split("#");
                   if (ticketPart.length > 1) {
@@ -1127,16 +1658,43 @@ var Salem = {
               })();
 
               campos.id = (() => {
-                let asPopupElement = req && req.dom
-                  ? req.dom.find(".AsPopup[href*='TicketID=']").first()
-                  : $(".AsPopup[href*='TicketID=']").first();
-                let href = asPopupElement.attr("href");
-                if (href) {
-                  let parts = href.split("=");
-                  if (parts.length > 2) {
-                    return parts[2].split(";")[0];
-                  }
+                // 1. Buscar en CUALQUIER enlace de la página que tenga TicketID=
+                let allLinks = req && req.dom
+                  ? req.dom.find("a[href*='TicketID=']")
+                  : $("a[href*='TicketID=']");
+                for (let el of allLinks) {
+                  let href = $(el).attr("href") || "";
+                  let match = href.match(/[?;&]TicketID=(\d+)/i);
+                  if (match) return match[1];
                 }
+
+                // 2. Input oculto en formularios
+                let ticketIdInput = req && req.dom
+                  ? req.dom.find('input[name="TicketID"]').val()
+                  : $('input[name="TicketID"]').val();
+                if (ticketIdInput) return ticketIdInput.trim();
+
+                // 3. TicketID en la URL actual
+                let urlMatch = window.location.href.match(/[?;&]TicketID=(\d+)/i);
+                if (urlMatch) return urlMatch[1];
+
+                // 4. OTOBO Core.Config (variable JS global de OTOBO)
+                try {
+                  if (window.Core && window.Core.Config && typeof window.Core.Config.Get === "function") {
+                    let id = window.Core.Config.Get("Ticket.TicketID");
+                    if (id) return String(id);
+                  }
+                } catch (e) {}
+
+                // 5. Buscar en scripts inline de la página (OTOBO a veces inyecta TicketID en JS)
+                try {
+                  let scripts = document.querySelectorAll("script:not([src])");
+                  for (let s of scripts) {
+                    let m = s.textContent.match(/['"](TicketID|ticketId)['"]\s*[=:]\s*['"]*(\d+)/i);
+                    if (m) return m[2];
+                  }
+                } catch (e) {}
+
                 return null;
               })();
 
@@ -1145,50 +1703,76 @@ var Salem = {
                 : $('input[name="ChallengeToken"]').val();
 
               let labels = req && req.dom ? req.dom.find("label") : $("label");
-              let ps = req && req.dom ? req.dom.find("p") : $("p");
 
-              // Verificar si hay etiquetas de "Servicio"
-              let isService = req && req.dom
-                ? req.dom.find('label:contains("Servicio")')
-                : $('label:contains("Servicio")');
+              // Procesar etiquetas de campos en OTOBO
+              if (labels.length > 0) {
+                const excludedLabels = [
+                  "Communication channel",
+                  "Sender Type",
+                  "Grabar configuración de filtros como defecto",
+                  "Customer visibility",
+                  "Creado por"
+                ];
 
-              // Procesar etiquetas de servicio si existen
-              if (isService.length != 0) {
-                labels.each(function (index, label) {
-                  let labelText = $(label).text().trim().slice(0, -1); // Quitar el ':' al final del texto
+                labels.each(function () {
+                  let labelText = $(this).text().trim().replace(/:$/, '').trim();
+                  if (!labelText || excludedLabels.some(ex => labelText.includes(ex))) return;
 
-                  // Lista de etiquetas a excluir
-                  const excludedLabels = [
-                    "Communication channel",
-                    "Sender Type",
-                    "Grabar configuración de filtros como defecto",
-                    "Customer visibility",
-                    "Creado por"
-                  ];
-
-                  // Verificar si la etiqueta actual no está en la lista de exclusiones
-                  if (!excludedLabels.some(excluded => labelText.includes(excluded))) {
-                    let correspondingP = $(label).next('p').text().trim(); // Obtener el párrafo correspondiente
-                    campos[labelText] = correspondingP;
+                  let valP = $(this).next('p');
+                  if (!valP.length) valP = $(this).siblings('p');
+                  if (!valP.length) valP = $(this).next('.Value');
+                  let valText = valP.text().trim();
+                  if (valText) {
+                    campos[labelText] = valText;
                   }
                 });
               }
+
+              // Normalizar alias comunes de OTOBO para consistencia con la API y MRA
+              campos['ID Equipo'] = campos['ID Equipo'] || campos['ID Móvil'] || campos['ID Equipo Centro de Control'] || campos['ID Equipo CC'] || campos.DynamicField_IDEQUIPO || '';
+              campos['Estación'] = campos['Estación'] || campos['Estacion'] || campos['Centro de Control'] || campos['Ubicación Centro de Control'] || campos['Ubicación Equipo Centro de Control'] || campos['Ubicación Equipo CC'] || campos['Patio'] || campos['Ubicación'] || campos['Ubicacion'] || campos.DynamicField_UBICACIONESTACION || '';
+              campos['Equipo Estación'] = campos['Equipo Estación'] || campos['Equipo Centro de Control'] || campos['Equipo CC'] || campos['Equipo'] || campos.DynamicField_EQUIPOESTACION || '';
+              campos['¿Quién Gestiona?'] = campos['¿Quién Gestiona?'] || campos['Quien Gestiona'] || campos.DynamicField_QUIENGESTIONA || '';
+
+              // Fallback explícito de alias para Fiscalizadores / Centro de Control
+              if (!campos["Estación"] && campos["Centro de Control"]) {
+                campos["Estación"] = campos["Centro de Control"];
+              }
+              if (!campos["Equipo Estación"] && campos["Equipo Centro de Control"]) {
+                campos["Equipo Estación"] = campos["Equipo Centro de Control"];
+              }
+
               campos.Creado
                 ? (campos.Creado = moment(
                   campos.Creado.replace(" - ", " "),
                   "DD/MM/YYYY HH:mm"
                 ).format("YYYY-MM-DD HH:mm"))
                 : (campos.Creado = undefined);
-              campos.titulo = campos.ticket
-                ? req && req.dom
-                  ? $(req.dom)
-                    .find(".Headline")[0]
-                    .childNodes[3].innerText.trim()
-                  : $(".Headline")[0].childNodes[3].innerText.trim()
-                : null;
-              campos.rotulo = campos.titulo
-                ? campos.titulo.split("—")[1].trim()
-                : null;
+
+              campos.titulo = (() => {
+                let headlineEl = req && req.dom ? req.dom.find(".Headline") : $(".Headline");
+                return headlineEl.length ? headlineEl.text().trim() : null;
+              })();
+
+              campos.rotulo = (() => {
+                if (!campos.titulo) return null;
+                // 1. Extraer después de Ticket#123456 — o Ticket#123456 -
+                let match = campos.titulo.match(/(?:Ticket#\s*\d+|#\s*\d+|\b\d{7,}\b)\s*[-—–]\s*([\s\S]+)$/i);
+                if (match && match[1]) {
+                  return match[1].trim();
+                }
+                // 2. Extraer después del primer guion largo (—) o en-dash (–)
+                let dashMatch = campos.titulo.match(/[—–]\s*([\s\S]+)$/);
+                if (dashMatch && dashMatch[1]) {
+                  return dashMatch[1].trim();
+                }
+                // 3. Extraer después del primer ' - ' (con espacios)
+                let spaceDash = campos.titulo.match(/\s+-\s+([\s\S]+)$/);
+                if (spaceDash && spaceDash[1]) {
+                  return spaceDash[1].trim();
+                }
+                return campos.titulo.trim();
+              })();
               campos.last_prog = campos.ticket
                 ? (() => {
                   let filas =
@@ -1279,15 +1863,17 @@ var Salem = {
                   for (let i = filas.length - 1; i >= 0; i--) {
                     let asunto = $(filas[i]).find("td:eq(5)").text().trim();
                     if (asunto.toLowerCase().includes("anulado")) {
-                      campoAnulado = asunto;
+                      // Eliminar prefijos numéricos como "07 ", "07 - ", etc.
+                      campoAnulado = asunto.replace(/^\d+[\s.\-_:]*/, "").trim();
                       break;
                     }
+                  }
+                  if (!campoAnulado && campos["Tipo de Falla"] && campos["Tipo de Falla"].toLowerCase().includes("anulado")) {
+                    campoAnulado = campos["Tipo de Falla"].replace(/^\d+[\s.\-_:]*/, "").trim();
                   }
                   return campoAnulado;
                 })()
                 : null;
-
-
 
               campos.partes = campos.ticket
                 ? (() => {
@@ -1311,7 +1897,6 @@ var Salem = {
                 })()
                 : [];
 
-              // Extrar nota de creación
               campos.isZoom =
                 campos.id != null && campos.rotulo != null ? true : false;
 
@@ -1393,6 +1978,13 @@ var Salem = {
           }
         });
       },
+      /**
+       * @description Sincroniza la configuración global de Salem descargándola desde Google Apps Script.
+       *
+       * @param {Object} [config] - Opciones adicionales de sincronización (ej. offDevices).
+       *
+       * @returns {Promise<Object|boolean>} Objeto storage actualizado o false si falló la sincronización.
+       */
       sync: (config) => {
         return new Promise(async (resolve) => {
           let res = await Salem.core.api({
@@ -1410,18 +2002,27 @@ var Salem = {
             }
             storage.syncDate = Date.now() + 7.2e6;
             await Salem.core.mem.set(storage);
+            if (typeof window !== "undefined" && window.SalemTecnicos && typeof window.SalemTecnicos.syncFromOTRS === "function") {
+              window.SalemTecnicos.syncFromOTRS().catch((e) => console.warn("[SALEM][SYNC] Error sync técnicos:", e));
+            }
             resolve(storage);
           } else {
+            let errorMsg = (res && res.message) ? res.message : (typeof res === "string" ? res : JSON.stringify(res));
             Salem.utils.modalError({
               title: "Sincronización fallida",
-              message:
-                "El API ha respondido con un error " + JSON.stringify(res),
+              message: "El API ha respondido con un error: " + errorMsg,
             });
+            resolve(false);
           }
         });
       },
     },
     mem: {
+      /**
+       * @description Obtiene el objeto de almacenamiento persistente de Salem desde chrome.storage.local.
+       *
+       * @returns {Promise<Object>} Datos almacenados en memoria.
+       */
       get: () => {
         return new Promise((resolve) => {
           chrome.storage.local.get(Salem.rules.storage, (e) => {
@@ -1429,6 +2030,13 @@ var Salem = {
           });
         });
       },
+      /**
+       * @description Guarda el objeto de almacenamiento persistente de Salem en chrome.storage.local.
+       *
+       * @param {Object} e - Datos a persistir en memoria.
+       *
+       * @returns {Promise<void>}
+       */
       set: (e) => {
         return new Promise((resolve) => {
           chrome.storage.local.set({ [Salem.rules.storage]: e }, () => {
@@ -1436,6 +2044,11 @@ var Salem = {
           });
         });
       },
+      /**
+       * @description Limpia completamente los almacenes locales y sincronizados de la extensión.
+       *
+       * @returns {Promise<void>}
+       */
       clear: () => {
         return new Promise((resolve) => {
           chrome.storage.sync.clear();
@@ -1444,39 +2057,104 @@ var Salem = {
         });
       },
     },
+    /**
+     * @description Realiza peticiones HTTP POST hacia la API de Google Apps Script con reintento y fallback de entorno.
+     *
+     * @param {Object}  request     - Payload de la solicitud con propiedades action y subaction.
+     * @param {boolean} [forceProd] - Si es verdadero, fuerza el uso del endpoint de producción omitiendo dev.
+     *
+     * @returns {Promise<Object>} Respuesta JSON parseada del backend.
+     */
     api: (request, forceProd) => {
       return new Promise(async (resolve) => {
-        let storage = await Salem.core.mem.get();
-        let urlType = forceProd
-          ? "prod"
-          : !storage
-            ? "prod"
-            : storage.dev
-              ? "dev"
-              : "prod";
-        $.ajax({
-          url: `${Salem.rules.api[urlType]}${urlType === "dev" ? `${storage.dev}` : ""
-            }`,
-          type: request.type ? request.type : "POST",
-          data: JSON.stringify(request),
-          success: (res) => {
-            resolve(res);
-          },
-        }).fail((ex) => {
-          $("body").html(ex.responseText);
-        });
+        try {
+          let storage = await Salem.core.mem.get();
+          let urlsToTry = [
+            Salem.rules.api.prod,
+            Salem.rules.api.workspace
+          ];
+          if (!forceProd && storage && storage.dev) {
+            urlsToTry.unshift(`${Salem.rules.api.dev}${storage.dev}`);
+          }
+
+          // DEBUG: ver qué se está enviando a la API
+          console.group("Salem.core.api → REQUEST");
+          console.log("Action:", request.action, "| Subaction:", request.subaction);
+          console.log("Payload completo:", JSON.stringify(request, null, 2));
+          console.groupEnd();
+
+          let lastErrorMsg = "";
+          for (let apiUrl of urlsToTry) {
+            if (!apiUrl) continue;
+            try {
+              let response = await fetch(apiUrl, {
+                method: request.type ? request.type : "POST",
+                headers: {
+                  "Content-Type": "text/plain;charset=utf-8",
+                },
+                body: JSON.stringify(request),
+                redirect: "follow",
+              });
+
+              // DEBUG: ver respuesta cruda
+              console.group("Salem.core.api ← RESPONSE [" + apiUrl.substring(0, 60) + "...]");
+              console.log("HTTP status:", response.status, response.statusText);
+
+              if (response.ok) {
+                let textData = await response.text();
+                console.log("Texto crudo (primeros 500 chars):", textData.substring(0, 500));
+                let parsed;
+                try {
+                  parsed = JSON.parse(textData);
+                } catch (e) {
+                  parsed = { done: false, message: "Respuesta no es JSON: " + textData.substring(0, 200) };
+                }
+                resolve(parsed);
+                return;
+              } else {
+                lastErrorMsg = `Error en API (${response.status}): ${response.statusText}`;
+              }
+            } catch (fetchErr) {
+              lastErrorMsg = fetchErr && fetchErr.message ? fetchErr.message : "Error de red";
+            }
+          }
+
+          resolve({ done: false, message: lastErrorMsg || "Error de conexión con API" });
+        } catch (error) {
+          resolve({ done: false, message: error && error.message ? error.message : "Error de conexión con API" });
+        }
       });
     },
   },
   utils: {
+    /**
+     * @description Convierte una ruta relativa interna en una URL absoluta de la extensión Chrome.
+     *
+     * @param {string} path - Ruta relativa del archivo.
+     *
+     * @returns {string} URL absoluta con esquema chrome-extension://.
+     */
     getFullPath: (path) => {
       return chrome.runtime.getURL(path);
     },
     checker: {
+      /**
+       * @description Determina si la ventana actual corresponde a una página del sistema OTOBO.
+       *
+       * @returns {boolean} Verdadero si la URL incluye '/otobo/'.
+       */
       isOTRS: () => {
         return window.location.href.includes("/otobo/");
       },
     },
+    /**
+     * @description Resuelve y obtiene el valor anidado en un objeto a partir de una ruta con notación de puntos.
+     *
+     * @param {string} e         - Ruta de acceso con puntos (ej. 'config.planes.active').
+     * @param {Object} reference - Objeto raíz donde buscar la propiedad.
+     *
+     * @returns {any} Valor de la propiedad anidada o undefined.
+     */
     getValueByRef: (e, reference) => {
       let valueReferenced = e.split(".").reduce(function (prev, next) {
         return prev && prev[next];
@@ -1484,6 +2162,14 @@ var Salem = {
       return valueReferenced;
     },
     swal: {
+      /**
+       * @description Muestra una alerta modal interactiva utilizando SweetAlert2 con configuración predefinida.
+       *
+       * @param {Object}   config   - Configuración de SweetAlert2 (title, text, icon, etc.).
+       * @param {Function} [callback] - Función a ejecutar tras cerrar el diálogo.
+       *
+       * @returns {Promise<void>}
+       */
       fire: (config, callback) => {
         return new Promise((resolve) => {
           Swal.fire({ ...config, ...Salem.utils.swal.predef(config) }).then(
@@ -1494,6 +2180,13 @@ var Salem = {
           );
         });
       },
+      /**
+       * @description Provee la configuración por defecto y restricciones de seguridad para modales SweetAlert2.
+       *
+       * @param {Object} config - Configuración base del modal.
+       *
+       * @returns {Object} Configuración enriquecida sin cierre accidental.
+       */
       predef: (config) => {
         return {
           icon: config && config.icon ? config.icon : undefined,
@@ -1503,6 +2196,27 @@ var Salem = {
         };
       },
     },
+    /**
+     * Sanitiza cadenas HTML eliminando etiquetas script y atributos de evento inline (onclick, onchange, etc.)
+     * para cumplimiento estricto de Content Security Policy (CSP - Manifest V3).
+     * @param {string} html
+     * @returns {string}
+     */
+    cleanCspHtml: (html) => {
+      if (typeof html !== "string") return html;
+      return html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, "")
+        .replace(/\s+on[a-z]{3,25}\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+        .replace(/\b(href|src)\s*=\s*(?:"\s*javascript:[^"]*"|'\s*javascript:[^']*')/gi, '$1="#"');
+    },
+    /**
+     * @description Realiza una petición GET para cargar vistas parciales y las parsea según el tipo solicitado.
+     *
+     * @param {string} url  - URL del recurso a solicitar.
+     * @param {string} type - Tipo de parser a aplicar ('dom', 'json', 'plain', etc.).
+     *
+     * @returns {Promise<any>} Contenido parseado.
+     */
     ajax: (url, type) => {
       return new Promise((resolve) => {
         $.ajax({
@@ -1522,25 +2236,146 @@ var Salem = {
       });
     },
     parse: {
+      /**
+       * @description Parsea una cadena HTML en nodos jQuery aplicando sanitización previa contra violaciones CSP.
+       *
+       * @param {string} string - Cadena HTML a parsear.
+       *
+       * @returns {jQuery} Colección de nodos DOM parseados.
+       */
       dom: (string) => {
+        if (typeof string === "string") {
+          let clean = Salem.utils.cleanCspHtml(string);
+          let parser = new DOMParser();
+          let doc = parser.parseFromString(clean, "text/html");
+          return $(doc.body.childNodes);
+        }
         return $(string);
       },
+      /**
+       * @description Convierte una cadena JSON a objeto JavaScript.
+       *
+       * @param {string|Object} string - Cadena JSON o objeto directo.
+       *
+       * @returns {Object} Objeto parseado.
+       */
       json: (string) => {
         return typeof string == "object" ? string : JSON.parse(string);
       },
+      /**
+       * @description Retorna la cadena de texto plana sin transformaciones.
+       *
+       * @param {string} string - Texto de entrada.
+       *
+       * @returns {string} Mismo texto sin cambios.
+       */
       plain: (string) => {
         return string;
       },
+      /**
+       * @description Parsea una cadena de texto en formato CSV a un array de objetos utilizando delimitador de OTOBO.
+       *
+       * @param {string} string - Contenido CSV a parsear.
+       *
+       * @returns {Array<Object>} Lista de registros con cabeceras como propiedades.
+       */
       csv: (string) => {
-        return Papa.parse(string, { header: true, skipEmptyLines: true }).data;
+        if (!string || typeof string !== "string") return [];
+        let cleanStr = string.trim();
+        if (!cleanStr) return [];
+
+        // 1. Intentar con PapaParse con delimitador ';' y limpieza de comillas
+        if (typeof Papa !== "undefined" && Papa.parse) {
+          try {
+            let papaRes = Papa.parse(cleanStr, {
+              header: true,
+              delimiter: ";",
+              skipEmptyLines: true,
+              dynamicTyping: false,
+              transformHeader: (h) => (h || "").replace(/^"|"$/g, "").trim(),
+              transform: (v) => (v || "").replace(/^"|"$/g, "").trim()
+            });
+            if (papaRes && Array.isArray(papaRes.data) && papaRes.data.length > 0) {
+              let firstRow = papaRes.data[0];
+              if (Object.keys(firstRow).length > 1 || !cleanStr.includes(";")) {
+                return papaRes.data;
+              }
+            }
+          } catch (err) {
+            console.warn("Salem :: Papa.parse error, usando parser nativo:", err);
+          }
+        }
+
+        // 2. Parser nativo específico para CSV de OTOBO
+        let lines = cleanStr.split(/\r\n|\r|\n/).filter((l) => l.trim().length > 0);
+        if (lines.length < 2) return [];
+
+        let delimiter = lines[0].includes(";") ? ";" : (lines[0].includes(",") ? "," : "\t");
+
+        let parseLine = (line) => {
+          let values = [];
+          let inQuotes = false;
+          let current = "";
+          for (let i = 0; i < line.length; i++) {
+            let char = line[i];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === delimiter && !inQuotes) {
+              values.push(current.replace(/^"|"$/g, "").replace(/""/g, '"').trim());
+              current = "";
+              continue;
+            }
+            current += char;
+          }
+          values.push(current.replace(/^"|"$/g, "").replace(/""/g, '"').trim());
+          return values;
+        };
+
+        let headers = parseLine(lines[0]);
+        let data = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          let values = parseLine(lines[i]);
+          if (values.length === 0 || (values.length === 1 && values[0] === "")) continue;
+          let row = {};
+          headers.forEach((header, idx) => {
+            if (header) {
+              row[header] = typeof values[idx] !== "undefined" ? values[idx] : "";
+            }
+          });
+          data.push(row);
+        }
+
+        return data;
       },
+      /**
+       * @description Parsea el contenido HTML de un formulario y extrae sus campos como objeto clave-valor.
+       *
+       * @param {string} string - Cadena HTML del formulario.
+       *
+       * @returns {Object} Diccionario con los nombres y valores de los campos del formulario.
+       */
       form: (string) => {
         return Salem.utils.getFormValues(string, "dom");
       },
+      /**
+       * @description Extrae la información estructurada de un ticket a partir de un fragmento HTML.
+       *
+       * @param {string} string - Cadena HTML a inspeccionar.
+       *
+       * @returns {Promise<Object>} Datos del ticket extraídos.
+       */
       info: async (string) => {
         let res = await Salem.core.runtime.getInfo({ dom: string });
         return res;
       },
+      /**
+       * @description Convierte las propiedades de un objeto JSON en una lista formateada en HTML con saltos <br>.
+       *
+       * @param {Object} json - Objeto con datos a formatear.
+       *
+       * @returns {string} Cadena HTML formateada.
+       */
       jsonToHtml: (json) => {
         let content = Object.keys(json)
           .map((key) => {
@@ -1552,15 +2387,38 @@ var Salem = {
         return content;
       },
     },
+    /**
+     * @description Redirige la navegación de la ventana activa hacia la URL especificada.
+     *
+     * @param {string} route - Destino de redirección.
+     *
+     * @returns {void}
+     */
     router: (route) => {
       window.location.href = route;
     },
+    /**
+     * @description Extrae y normaliza los valores de un formulario a partir de un evento de submit o fragmento DOM.
+     *
+     * @param {Event|string|jQuery} submitEvent - Evento de envío, cadena HTML o elemento formulario.
+     * @param {string}              [type]      - Tipo de origen ('dom', 'form', o indefinido).
+     * @param {boolean}             [group]     - Si es verdadero, agrupa campos dinámicos bajo la propiedad 'original'.
+     *
+     * @returns {Object} Diccionario con los campos y valores extraídos del formulario.
+     */
     getFormValues: (submitEvent, type, group) => {
       let data = null;
       if (typeof type == "undefined") {
         data = $(submitEvent.currentTarget).serializeArray();
       } else if (type == "dom") {
-        data = $(submitEvent).find("form").serializeArray();
+        if (typeof submitEvent === "string") {
+          let clean = Salem.utils.cleanCspHtml(submitEvent);
+          let parser = new DOMParser();
+          let doc = parser.parseFromString(clean, "text/html");
+          data = $(doc).find("form").serializeArray();
+        } else {
+          data = $(submitEvent).find("form").serializeArray();
+        }
       } else if (type == "form") {
         data = $(submitEvent).serializeArray();
       }
@@ -1576,6 +2434,13 @@ var Salem = {
       });
       return res;
     },
+    /**
+     * @description Muestra u oculta la pantalla de carga visual de Salem con título y mensaje configurables.
+     *
+     * @param {Object|null} [config] - Configuración del modal con título y mensaje, o null para ocultarlo.
+     *
+     * @returns {Promise<void>}
+     */
     loading: (config) => {
       return new Promise(async (resolve) => {
         if (!config) {
@@ -1599,6 +2464,13 @@ var Salem = {
         resolve();
       });
     },
+    /**
+     * @description Despliega una vista de error en el contenedor principal de la extensión.
+     *
+     * @param {Object} config - Datos descriptivos del error a desplegar.
+     *
+     * @returns {Promise<void>}
+     */
     modalError: async (config) => {
       await Salem.utils.loading();
       let error = await Salem.utils.partials.get(
@@ -1817,9 +2689,17 @@ var Salem = {
         resolve();
       });
     },
+    /**
+     * @description Convierte una cadena con etiquetas HTML en texto plano limpio eliminando marcado y scripts.
+     *
+     * @param {string} string - Cadena HTML a transformar.
+     *
+     * @returns {string} Texto plano resultante sin etiquetas HTML.
+     */
     htmlToText: (string) => {
+      let clean = Salem.utils.cleanCspHtml(string);
       let tmp = document.createElement("div");
-      tmp.innerHTML = string;
+      tmp.innerHTML = clean;
       string = tmp.textContent || tmp.innerText || "";
       tmp.remove();
       string = string.trim();
@@ -1852,6 +2732,13 @@ var Salem = {
         });
         return res;
       },
+      /**
+       * @description Carga, evalúa middleware y despliega una vista de panel en la barra lateral de la extensión.
+       *
+       * @param {string} panel - Identificador del panel a cargar según Salem.rules.routes.panels.
+       *
+       * @returns {Promise<void>}
+       */
       getSetPanel: async (panel) => {
         let resources = Salem.rules.routes.panels[panel];
         let middleware =
@@ -1868,10 +2755,31 @@ var Salem = {
         }
         Salem.utils.loading();
       },
+      /**
+       * @description Inyecta dinámicamente un script en el contexto seguro de la extensión con protección CSP para MV3.
+       *
+       * @param {string} route - Ruta relativa del archivo de script a inyectar.
+       *
+       * @returns {void}
+       */
       injectScript: (route) => {
+        // ── GUARD CSP (Manifest V3) ─────────────────────────────────────────
+        // Solo se ejecuta en contexto chrome-extension:// (popup/sidebar).
+        // En pages de extensión, 'script-src self' permite <script src="chrome-extension://...">
+        // lo cual es seguro. En OTOBO (content_script), la CSP del sitio lo bloquearía,
+        // por eso el guard retorna temprano si el contexto no es de extensión.
+        // ──────────────────────────────────────────────────────────────────────
+        if (typeof window === "undefined" || window.location.protocol !== "chrome-extension:") {
+          console.warn(
+            "[SALEM][CSP] injectScript omitido fuera del contexto de la extensión (ventana web OTOBO):",
+            route
+          );
+          return;
+        }
+        const url = chrome.runtime.getURL(route);
         const script = document.createElement("script");
         script.setAttribute("tag-name", "partialScript");
-        script.setAttribute("src", chrome.runtime.getURL(route));
+        script.setAttribute("src", url);
         const head =
           document.head ||
           document.getElementsByTagName("head")[0] ||
@@ -1880,6 +2788,11 @@ var Salem = {
       },
     },
     environ: {
+      /**
+       * @description Cambia el entorno de la extensión al modo de desarrollo solicitando un token de acceso.
+       *
+       * @returns {Promise<void>}
+       */
       setDev: () => {
         return new Promise(async (resolve) => {
           let storage = await Salem.core.mem.get();
@@ -1894,6 +2807,11 @@ var Salem = {
           resolve();
         });
       },
+      /**
+       * @description Restablece el entorno de la extensión al modo de producción eliminando el token de desarrollo.
+       *
+       * @returns {Promise<void>}
+       */
       setProd: () => {
         return new Promise(async (resolve) => {
           let storage = await Salem.core.mem.get();
@@ -1909,6 +2827,7 @@ var Salem = {
     api: {
       dev: "https://script.google.com/macros/s/AKfycbw9iEQ5I8ZXqHyMG8KbvkSKqP9CLkc7UKGeYMFk9WY/dev?access_token=",
       prod: "https://script.google.com/macros/s/AKfycbxIjCSxv1abCQE0kk4BWALYSsM3HuHd1kvlHu2a41JSnAJfOVmB1-kXBqp7oEgmdKO5/exec",
+      workspace: "https://script.google.com/a/macros/rbsas.co/s/AKfycbxIjCSxv1abCQE0kk4BWALYSsM3HuHd1kvlHu2a41JSnAJfOVmB1-kXBqp7oEgmdKO5/exec",
     },
     routes: {
       otrs: "https://helpdesk.rbsas.co/otobo/index.pl",
@@ -1945,6 +2864,13 @@ var Salem = {
           script: "/sources/popup/menus/planes/preventivos/preventivos.js",
           title: "Mantenimiento preventivo",
           message: "Genere tickets nuevos para mantenimientos preventivos.",
+          middleware: { isOTRS: "", isAlive: "" },
+        },
+        fiscalizadores: {
+          view: "/sources/popup/menus/planes/fiscalizadores/fiscalizadores.html",
+          script: "/sources/popup/menus/planes/fiscalizadores/fiscalizadores.js",
+          title: "Mantenimiento preventivo Fiscalizadores",
+          message: "Genere tickets de preventivo para equipos Fiscalizadores.",
           middleware: { isOTRS: "", isAlive: "" },
         },
         mttoEspeciales: {
@@ -2032,4 +2958,6 @@ var Salem = {
   },
 };
 
-if (typeof window != "undefined") Salem.core.listen();
+// Ejecutar listen() en cualquier contexto window (isOTRS() dentro protege el código de MRA)
+if (typeof window !== "undefined") Salem.core.listen();
+

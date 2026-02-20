@@ -4,6 +4,13 @@ $(() => {
     const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
     const quincenas = ['Q1', 'Q2'];
 
+    /**
+     * @description Genera las opciones de nombre para los planes rutinarios.
+     * Combina tipos BCA y TCA con todos los meses y quincenas (Q1, Q2),
+     * y agrega opciones de RACK por mes sin quincena.
+     *
+     * @returns {Array<string>} Lista ordenada de nombres de planes posibles.
+     */
     function generarOpcionesNombres() {
         let opciones = [];
 
@@ -26,6 +33,12 @@ $(() => {
 
     loadEvents();
 
+    /**
+     * @description Consulta y descarga los eventos del calendario de mantenimientos rutinarios
+     * desde el backend (GAS). Al recibir los datos, invoca el renderizado de la tabla interactiva.
+     *
+     * @returns {Promise<void>}
+     */
     async function loadEvents() {
         await Salem.utils.loading({
             title: "Consultando eventos",
@@ -58,6 +71,13 @@ $(() => {
         }
     }
 
+    /**
+     * @description Renderiza la tabla de eventos rutinarios en el DOM.
+     * Para cada evento determina el tipo de equipo, la quincena activa y genera
+     * las opciones de nombre disponibles según el filtro. Vincula los listeners de cambio.
+     *
+     * @returns {void}
+     */
     function renderTable() {
         const tbody = $('#eventsTableBody');
         tbody.empty();
@@ -159,14 +179,40 @@ $(() => {
         $('.nombre-select').on('change', handleInputChange);
     }
 
+    /**
+     * @description Convierte una cadena de fecha en formato `YYYY-MM-DD HH:mm:ss`
+     * al formato `YYYY-MM-DDTHH:mm` requerido por los inputs de tipo `datetime-local`.
+     *
+     * @param {string} dateString - Cadena de fecha en formato `YYYY-MM-DD HH:mm:ss`.
+     *
+     * @returns {string} Fecha formateada para `datetime-local`, o cadena vacía si no hay valor.
+     */
     function formatDateForInput(dateString) {
         return dateString ? moment(dateString, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DDTHH:mm') : '';
     }
 
+    /**
+     * @description Convierte el valor de un input `datetime-local` al formato de almacenamiento
+     * `YYYY-MM-DD HH:mm:ss` utilizado por el backend.
+     *
+     * @param {string} inputValue - Valor del input en formato `YYYY-MM-DDTHH:mm`.
+     *
+     * @returns {string} Fecha formateada en `YYYY-MM-DD HH:mm:ss`, o cadena vacía si no hay valor.
+     */
     function formatDateFromInput(inputValue) {
         return inputValue ? moment(inputValue).format('YYYY-MM-DD HH:mm:ss') : '';
     }
 
+    /**
+     * @description Gestiona el cambio de valor en los campos de fecha (`fecha-input`) y nombre (`nombre-select`)
+     * de la tabla de eventos. Actualiza el modelo en memoria `eventsData` y recalcula la quincena
+     * cuando el nombre seleccionado contiene un sufijo Q1 o Q2.
+     *
+     * @param {Event} e - Evento de cambio (`change`) disparado por jQuery sobre el input o select modificado.
+     * @param {HTMLElement} e.target - Elemento que disparó el evento (input de fecha o select de nombre).
+     *
+     * @returns {void}
+     */
     function handleInputChange(e) {
         const index = $(e.target).data('index');
 

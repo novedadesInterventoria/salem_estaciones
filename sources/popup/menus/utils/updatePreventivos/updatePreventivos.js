@@ -19,7 +19,8 @@ $(() => {
             eqMoviles: '6. EQ MOV',
             pip: '7. PIP',
             pp: '8. PP',
-            upsCC: '9. UPS-GE CC'
+            upsCC: '9. UPS-GE CC',
+            fiscalizador: '10. FISCALIZADOR'
         },
         estadoBadges: {
             completado: 'bg-success',
@@ -41,11 +42,23 @@ $(() => {
     // Inicializaci�n
     init();
 
+    /**
+     * @description Inicializa el módulo de consulta de mantenimientos preventivos.
+     * Carga los datos iniciales y configura los escuchadores de eventos.
+     *
+     * @returns {void}
+     */
     function init() {
         loadPreventivos();
         setupEventListeners();
     }
 
+    /**
+     * @description Configura todos los escuchadores de eventos del DOM para el módulo
+     * (filtros, búsqueda, descarga, KPIs y selección de filas en la tabla).
+     *
+     * @returns {void}
+     */
     function setupEventListeners() {
         $('#equipoSelect').on('change', handleEquipoChange);
         $('#searchInput').on('input', handleSearch);
@@ -81,6 +94,12 @@ $(() => {
     }
 
     // Carga de datos
+    /**
+     * @description Carga todos los datos de mantenimientos preventivos desde el backend.
+     * Almacena la respuesta en `state.allData` y muestra un estado vacío con mensaje inicial.
+     *
+     * @returns {Promise<void>}
+     */
     async function loadPreventivos() {
         await showLoading('Consultando mtto Preventivos', 'Se estn obteniendo los mantenimientos preventivos.');
 
@@ -110,6 +129,12 @@ $(() => {
     }
 
     // Manejo de eventos
+    /**
+     * @description Gestiona el cambio de equipo en el selector principal.
+     * Filtra y normaliza los datos del equipo seleccionado, actualiza la tabla y los KPIs.
+     *
+     * @returns {void}
+     */
     function handleEquipoChange() {
         const equipoKey = $(this).val();
 
@@ -135,6 +160,16 @@ $(() => {
         loadEquipoData(equipoData, equipoKey);
     }
 
+    /**
+     * @description Normaliza y carga los datos del equipo seleccionado en el estado local.
+     * Soporta dos formatos de datos: Array de Objetos y Array de Arrays (legacy).
+     * Actualiza cabeceras, tabla, conteo de registros y KPIs automáticamente.
+     *
+     * @param {Object}   equipoData - Datos del equipo desde `state.allData` con propiedades `data` y `columns`.
+     * @param {string}   equipoKey  - Clave identificadora del equipo (ej. `'cctv'`, `'bca'`).
+     *
+     * @returns {void}
+     */
     function loadEquipoData(equipoData, equipoKey) {
         const rawData = equipoData.data || [];
         state.currentData = [];
@@ -183,6 +218,12 @@ $(() => {
         loadKPIs();
     }
 
+    /**
+     * @description Filtra la tabla en tiempo real según el texto ingresado en el campo de búsqueda.
+     * Si el campo está vacío, restaura todos los datos del equipo activo.
+     *
+     * @returns {void}
+     */
     function handleSearch() {
         const searchTerm = $(this).val().toLowerCase().trim();
 
@@ -201,11 +242,26 @@ $(() => {
         updateSearchResults(filteredData.length, searchTerm);
     }
 
+    /**
+     * @description Limpia el campo de búsqueda y dispara su evento de entrada para restaurar la tabla.
+     *
+     * @returns {void}
+     */
     function clearSearch() {
         $('#searchInput').val('').trigger('input');
     }
 
     // Procesamiento de datos
+    /**
+     * @description Convierte una matriz de datos (Array de Arrays) al formato Array de Objetos
+     * usando las columnas como claves. Agrega la propiedad `tipoEquipo` a cada fila.
+     *
+     * @param {Array<Array>} data      - Filas de datos crudos (sin la fila de cabecera).
+     * @param {Array<string>} columns  - Nombres de las columnas en el mismo orden que los datos.
+     * @param {string}        equipoKey - Clave identificadora del equipo para asignar `tipoEquipo`.
+     *
+     * @returns {Array<Object>} Array de objetos normalizados con las columnas como propiedades.
+     */
     function processEquipoData(data, columns, equipoKey) {
         if (!Array.isArray(data)) return [];
 
@@ -218,6 +274,14 @@ $(() => {
         });
     }
 
+    /**
+     * @description Filtra las filas del estado actual usando una búsqueda insensible a mayúsculas
+     * sobre todos los campos de las columnas activas. Para columnas de fecha también compara la representación formateada.
+     *
+     * @param {string} searchTerm - Término de búsqueda en minúsculas ya aplicado.
+     *
+     * @returns {Array<Object>} Subconjunto de `state.currentData` que coincide con el término.
+     */
     function filterData(searchTerm) {
         return state.currentData.filter(row =>
             state.currentColumns.some(col => {
@@ -235,6 +299,13 @@ $(() => {
     }
 
     // Renderizado
+    /**
+     * @description Actualiza los encabezados de la tabla con los nombres de columnas formateados (capitalizados).
+     *
+     * @param {Array<string>} columns - Nombres de las columnas a renderizar.
+     *
+     * @returns {void}
+     */
     function updateTableHeaders(columns) {
         const thead = $('#tableHeaders');
         thead.empty();
@@ -245,6 +316,14 @@ $(() => {
         });
     }
 
+    /**
+     * @description Renderiza las filas de datos en la tabla de preventivos.
+     * Para cada fila aplica el estilo de selección si está en `state.selectedRows`.
+     *
+     * @param {Array<Object>} data - Array de objetos normalizados a renderizar en la tabla.
+     *
+     * @returns {void}
+     */
     function renderTable(data) {
         const tbody = $('#preventivosTableBody');
         tbody.empty();
@@ -269,6 +348,15 @@ $(() => {
         });
     }
 
+    /**
+     * @description Genera el HTML de una celda de tabla según el tipo de columna.
+     * Las columnas de ESTADO aplican un badge con color semántico; las de FECHA se formatean con moment.
+     *
+     * @param {string} columnName - Nombre de la columna que determina el formato del valor.
+     * @param {string|number} value - Valor crudo de la celda a renderizar.
+     *
+     * @returns {string} HTML de la celda `<td>` lista para insertar en el DOM.
+     */
     function createTableCell(columnName, value) {
         const colUpper = columnName.toUpperCase();
         const safeValue = escapeHtml(value || '');
@@ -286,6 +374,13 @@ $(() => {
         return `<td>${safeValue}</td>`;
     }
 
+    /**
+     * @description Muestra un mensaje de estado vacío en el cuerpo de la tabla cuando no hay datos o se aplican filtros sin resultados.
+     *
+     * @param {string} message - Mensaje descriptivo a mostrar al usuario.
+     *
+     * @returns {void}
+     */
     function showEmptyState(message) {
         const tbody = $('#preventivosTableBody');
         const colspan = state.currentColumns.length || 10;
@@ -301,6 +396,13 @@ $(() => {
     }
 
     // Utilidades
+    /**
+     * @description Retorna la clase CSS de Bootstrap correspondiente al estado del ticket o equipo.
+     *
+     * @param {string} estado - Estado del equipo o ticket.
+     *
+     * @returns {string} Clase CSS semántica de Bootstrap.
+     */
     function getEstadoBadgeClass(estado) {
         const estadoLower = (estado || '').toLowerCase();
 
@@ -313,6 +415,13 @@ $(() => {
         return CONFIG.estadoBadges.default;
     }
 
+    /**
+     * @description Formatea una fecha dada al formato DD-MM-YYYY utilizando moment.js.
+     *
+     * @param {string|Date} dateValue - Valor de fecha a formatear.
+     *
+     * @returns {string} Cadena de fecha formateada, o el valor original si es inválido.
+     */
     function formatDate(dateValue) {
         if (!dateValue) return '';
 
@@ -320,10 +429,24 @@ $(() => {
         return date.isValid() ? date.format('DD-MM-YYYY') : dateValue;
     }
 
+    /**
+     * @description Capitaliza la primera letra de una cadena de texto y convierte el resto a minúsculas.
+     *
+     * @param {string} str - Texto a formatear.
+     *
+     * @returns {string} Texto capitalizado.
+     */
     function capitalizeFirst(str) {
         return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     }
 
+    /**
+     * @description Sanitiza una cadena escapando caracteres especiales HTML (&, <, >, ", ').
+     *
+     * @param {string} text - Texto a sanitizar.
+     *
+     * @returns {string} Texto seguro sin riesgo de inyección HTML.
+     */
     function escapeHtml(text) {
         const map = {
             '&': '&amp;',
@@ -335,6 +458,11 @@ $(() => {
         return String(text).replace(/[&<>"']/g, m => map[m]);
     }
 
+    /**
+     * @description Restablece las variables del estado local de preventivos a sus valores iniciales.
+     *
+     * @returns {void}
+     */
     function resetState() {
         state.currentEquipo = '';
         state.currentData = [];
@@ -342,6 +470,11 @@ $(() => {
         updateRecordCount(0);
     }
 
+    /**
+     * @description Limpia el contenedor visual de KPIs y destruye las instancias activas de Chart.js.
+     *
+     * @returns {void}
+     */
     function clearKPIs() {
         // Limpiar el contenedor de KPIs
         const container = $('#kpisContainer');
@@ -357,6 +490,14 @@ $(() => {
         state.kpisData = null;
     }
 
+    /**
+     * @description Actualiza el texto informativo del contador de registros visibles en pantalla.
+     *
+     * @param {number}      current      - Cantidad de registros actualmente visibles o filtrados.
+     * @param {number|null} [total=null] - Cantidad total de registros disponibles.
+     *
+     * @returns {void}
+     */
     function updateRecordCount(current, total = null) {
         const text = total !== null
             ? `Mostrando ${current} de ${total} registros`
@@ -364,6 +505,14 @@ $(() => {
         $('#recordCount').text(text);
     }
 
+    /**
+     * @description Muestra u oculta la notificación de resultados de búsqueda según las coincidencias.
+     *
+     * @param {number} resultCount - Cantidad de resultados encontrados.
+     * @param {string} searchTerm  - Término buscado por el usuario.
+     *
+     * @returns {void}
+     */
     function updateSearchResults(resultCount, searchTerm) {
         const resultsInfo = $('#resultsInfo');
         const resultsText = $('#resultsText');
@@ -377,20 +526,47 @@ $(() => {
         }
     }
 
+    /**
+     * @description Muestra un diálogo modal de carga con título y mensaje personalizados.
+     *
+     * @param {string} title   - Título del diálogo de carga.
+     * @param {string} message - Mensaje explicativo del proceso en ejecución.
+     *
+     * @returns {Promise<void>}
+     */
     async function showLoading(title, message) {
         await Salem.utils.loading({ title, message });
     }
 
+    /**
+     * @description Oculta el diálogo modal de carga activo.
+     *
+     * @returns {Promise<void>}
+     */
     async function hideLoading() {
         await Salem.utils.loading();
     }
 
+    /**
+     * @description Muestra una notificación toast con estilo semántico.
+     *
+     * @param {string} title   - Título del toast.
+     * @param {string} message - Contenido descriptivo del toast.
+     * @param {string} type    - Tipo de alerta ('success', 'error', 'warning', 'info').
+     *
+     * @returns {void}
+     */
     function showToast(title, message, type) {
         Salem.utils.toast({ title, message, type, noHide: true });
     }
 
     // ========== KPIs FUNCTIONS ==========
 
+    /**
+     * @description Orquestador principal para el cálculo y renderizado de gráficos KPI en preventivos.
+     *
+     * @returns {Promise<void>}
+     */
     async function loadKPIs() {
         await showLoading('Calculando KPIs', 'Procesando indicadores de gesti�n...');
 
@@ -431,6 +607,11 @@ $(() => {
         }
     }
 
+    /**
+     * @description Calcula los totales, pendientes y realizados para el equipo actualmente seleccionado.
+     *
+     * @returns {Object} Diccionario con la matriz de indicadores KPI por clave de equipo.
+     */
     function calculateKPIsFromData() {
         const kpis = {};
 
@@ -480,6 +661,13 @@ $(() => {
         return kpis;
     }
 
+    /**
+     * @description Valida y formatea la respuesta de datos KPI para su consumo por los componentes de gráficos.
+     *
+     * @param {Object} apiResponse - Objeto con la respuesta y datos de KPI.
+     *
+     * @returns {boolean} Verdadero si los datos son válidos y fueron asignados a state.kpisData.
+     */
     function loadKPIData(apiResponse) {
         if (!apiResponse || !apiResponse.data) {
             return false;
@@ -505,6 +693,11 @@ $(() => {
         return true;
     }
 
+    /**
+     * @description Renderiza los contenedores de tarjetas y lienzos canvas para los gráficos de KPI de preventivos.
+     *
+     * @returns {void}
+     */
     function renderKPICharts() {
         const container = $('#kpisContainer');
         container.empty();
@@ -558,6 +751,15 @@ $(() => {
         }
     }
 
+    /**
+     * @description Inicializa y renderiza un gráfico de pastel con Chart.js para los datos del equipo especificado.
+     *
+     * @param {string}       canvasId  - ID del elemento canvas donde se dibujará el gráfico.
+     * @param {string}       equipoKey - Clave identificadora del equipo.
+     * @param {Array<Array>} data      - Matriz de datos de KPI (etiquetas y valores).
+     *
+     * @returns {void}
+     */
     function createPieChart(canvasId, equipoKey, data) {
         const kpiData = parseEquipoKPIData(data);
 
@@ -612,6 +814,13 @@ $(() => {
         updateChartStats(equipoKey, kpiData);
     }
 
+    /**
+     * @description Extrae y convierte a valores enteros las métricas numéricas desde la matriz de KPI del equipo.
+     *
+     * @param {Array<Array>} data - Matriz con filas [etiqueta, valor].
+     *
+     * @returns {{ total: number, pendientes: number, realizados: number }|null} Objeto estructurado de métricas.
+     */
     function parseEquipoKPIData(data) {
 
         if (!Array.isArray(data) || data.length < 3) {
@@ -625,6 +834,14 @@ $(() => {
         return { total, pendientes, realizados };
     }
 
+    /**
+     * @description Actualiza el pie de tarjeta con los valores numéricos y la barra de progreso porcentual del KPI.
+     *
+     * @param {string} equipoKey - Clave identificadora del equipo.
+     * @param {Object} kpiData   - Objeto estructurado con total, pendientes y realizados.
+     *
+     * @returns {void}
+     */
     function updateChartStats(equipoKey, kpiData) {
         const { total, pendientes, realizados } = kpiData;
         const percentage = total > 0 ? ((realizados / total) * 100).toFixed(1) : 0;
@@ -756,6 +973,13 @@ $(() => {
     /**
      * Limpia y normaliza el nombre de una columna.
      */
+    /**
+     * @description Limpia prefijos dinámicos y normaliza guiones bajos a espacios para nombres legibles de columna.
+     *
+     * @param {string} name - Nombre de campo original.
+     *
+     * @returns {string} Nombre normalizado para la cabecera del reporte.
+     */
     function cleanColumnName(name) {
         if (!name) return '';
         return name
@@ -767,12 +991,13 @@ $(() => {
     // ========== REPORT FUNCTIONALITY ==========
 
     /**
-     * Abre el modal de reporte de novedades.
-     * Carga el parcial HTML, lo inserta en el DOM y maneja el ciclo de vida del modal.
+     * @description Abre el modal de reporte de novedades.
+     * Carga el parcial HTML desde la ruta definida en Salem.rules.routes.panels.report.view,
+     * lo inserta en el DOM y maneja el ciclo de vida del modal con CKEditor y mensajes rápidos.
+     *
+     * @returns {Promise<void>}
      */
     async function openReportModal() {
-        // FIX: La ruta correcta es Salem.rules.routes.panels.report.view
-        // FIX: Se debe pasar un objeto vacío como segundo argumento para evitar error en Object.keys
         const reportModalHtml = await Salem.utils.partials.get(Salem.rules.routes.panels.report.view, {});
         $('body').append(reportModalHtml);
 
@@ -857,6 +1082,14 @@ $(() => {
      * @param {bootstrap.Modal} modal - Instancia del modal
      * @param {HTMLElement} modalEl - Elemento del DOM del modal
      */
+    /**
+     * @description Procesa y envía el reporte de novedades con evidencias en base64 hacia la API de Salem.
+     *
+     * @param {bootstrap.Modal} modal   - Instancia del modal de Bootstrap.
+     * @param {HTMLElement}     modalEl - Elemento DOM del modal para cierre y limpieza.
+     *
+     * @returns {Promise<void>}
+     */
     async function handleSendReport(modal, modalEl) {
         const type = $('#reportType').val();
         const message = $('#reportMessage').val();
@@ -923,6 +1156,13 @@ $(() => {
      * Utilidad para convertir File a Base64.
      * @param {File} file 
      * @returns {Promise<Object>}
+     */
+    /**
+     * @description Lee de forma asíncrona un archivo mediante FileReader y resuelve su contenido en Base64 limpio.
+     *
+     * @param {File} file - Archivo seleccionado por el usuario.
+     *
+     * @returns {Promise<{ name: string, mimeType: string, data: string }>} Objeto con nombre, MIME y payload base64.
      */
     function readFileAsBase64(file) {
         return new Promise((resolve, reject) => {

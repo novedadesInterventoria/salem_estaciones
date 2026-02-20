@@ -67,10 +67,34 @@
         </div>
     </div>
 
-    <!-- Cambio de parte -->
-    <div class="mt-4">
-        <div class="row g-3 align-items-end">
-            <div class="col-md-6">
+    <!-- Aseguramiento -->
+    <div class="row g-3 mt-3">
+        <div class="col-12">
+            <label class="form-label fw-semibold">
+                <i class="fa-solid fa-shield-halved me-2 text-primary"></i>Aseguramiento
+            </label>
+            <div class="p-3 border rounded bg-light d-flex align-items-center justify-content-between">
+                <div>
+                    <span id="labelAseguramiento" class="badge bg-success fs-6 py-2 px-3">
+                        <i class="fa-solid fa-circle-check me-2"></i>VALIDADO POR ASEGURAMIENTO
+                    </span>
+                    <input type="hidden" name="aseguramiento" id="inputAseguramiento" value="VALIDADO">
+                    <div id="alertAnulacion" class="text-danger small mt-2 d-none fw-semibold">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i>Ticket marcado para ANULACIÓN definitiva
+                    </div>
+                </div>
+                <div class="form-check form-switch fs-5 mb-0">
+                    <input class="form-check-input" type="checkbox" id="chkAnular" role="switch" style="cursor: pointer;">
+                    <label class="form-check-label fs-6 fw-normal ms-2 text-muted" for="chkAnular" style="cursor: pointer;">¿Anular ticket?</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cambio de parte y Partes reemplazadas -->
+    <div class="cambio-parte-section mt-4">
+        <div class="row g-3">
+            <div class="col-12">
                 <label class="form-label fw-semibold">
                     <i class="fa-solid fa-screwdriver-wrench me-2 text-warning"></i>¿Cambio de parte?
                 </label>

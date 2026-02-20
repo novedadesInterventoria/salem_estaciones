@@ -16,16 +16,19 @@ $(async () => {
        
     })
 
-    await Salem.utils.loading({ title: 'Obteniendo técnicos', message: 'Se está consultando el listado de técnicos disponibles en OTOBO.' })
-    let queryAjax = await Salem.otrs.ajax({ Action: 'AgentTicketNote', Subaction: 'AJAXUpdate', ElementChanged: 'DynamicField_QUIENGESTIONA', TicketID: '943890', transform: 'json' })
-    let tecnicos = queryAjax.DynamicField_QUIENGESTIONA.map(u => {
-        return { name: u[0] }
-    })
-    new TomSelect($(panel).find('[name="tcampo"]'), {
-        valueField: 'name', labelField: 'name', searchField: 'name', options: tecnicos
-    })
-    Salem.utils.loading()
+    /**
+     * Carga de técnicos delegada al módulo compartido _tecnicos.js.
+     * Estrategia: cache-first + MutationObserver + retry exponencial en background.
+     * El observer espera a que [name="tcampo"] exista en el panel antes de montar TomSelect.
+     */
+    SalemTecnicos.init(panel)
 
+    /**
+     * @description Filtra y actualiza el selector de equipos (TomSelect) según la estación seleccionada.
+     * Aplica el filtro activo si existe y reinicia los campos de índice y costado.
+     *
+     * @returns {void}
+     */
     function setEquipos() {
         let [estacion] = this.items
         let equipos = storage.config.otrs.CMDB.filter(u => u.estacion == estacion).map(fila => {
@@ -45,20 +48,46 @@ $(async () => {
         $('[name="costado"]').val('')
     }
 
+    /**
+     * @description Obtiene la ubicación/costado del equipo seleccionado en la CMDB y actualiza
+     * el campo visual correspondiente y el input index del formulario.
+     *
+     * @returns {void}
+     */
     function setCostado() {
         let [index] = this.items
         let regitro = storage.config.otrs.CMDB.find(u => u.index == index)
-        $('[name="costado"]').val(regitro.ubicacion)
+        $('[name="costado"]').val(regitro ? (regitro.ubicacion || '') : '')
         $('[name="index"]').val(JSON.stringify(this.items))
     }
 
+    /**
+     * @description Obtiene la hora actual del reloj local del PC en formato HH:mm
+     * y la asigna al campo de hora en el formulario de creación (completamente editable).
+     *
+     * @returns {void}
+     */
+    function setHoraActual() {
+        const ahora = new Date()
+        const hh = String(ahora.getHours()).padStart(2, '0')
+        const mm = String(ahora.getMinutes()).padStart(2, '0')
+        $(panel).find('[name="hora"]').val(`${hh}:${mm}`)
+    }
+
     $(panel).find('[name="progresar"]').on('change', toggleSweep)
+    /**
+     * @description Conmuta la visibilidad y activación del editor de plantilla (ClassicEditor)
+     * y del campo de hora según el valor del selector `progresar` ('SI' o 'NO').
+     *
+     * @returns {Promise<void>}
+     */
     async function toggleSweep() {
         let val = $(this).val()
         if (val == 'SI') {
             editorPanel = await ClassicEditor.create($('div#editor')[0], { placeholder: 'Ingrese la plantilla del técnico aquí.' })
             $('[name="hora"]').attr('required', 'required')
             $('[name="hora"]').closest('.col').removeClass('d-none')
+            setHoraActual()
         }
         else {
             editorPanel = null
@@ -68,4 +97,9 @@ $(async () => {
         }
     }
     $('#create').html(panel)
+
+    // [REQ 3] Los tickets normalmente quedan "En progreso":
+    // Preseleccionar "SI" y activar el editor/hora por defecto al abrir el panel.
+    // Se usa el selector sobre el DOM vivo (ya insertado) para garantizar la activación.
+    $('#create [name="progresar"]').val('SI').trigger('change')
 })

@@ -18,16 +18,20 @@ $(async () => {
         onChange: setTipos
     })
 
-    await Salem.utils.loading({ title: 'Obteniendo técnicos', message: 'Se está consultando el listado de técnicos disponibles en OTOBO.' })
-    let queryAjax = await Salem.otrs.ajax({ Action: 'AgentTicketNote', Subaction: 'AJAXUpdate', ElementChanged: 'DynamicField_QUIENGESTIONA', TicketID: '943890',  transform: 'json' })
-    let tecnicos = queryAjax.DynamicField_QUIENGESTIONA.map(u => {
-        return { name: u[0] }
-    })
-    new TomSelect($(panel).find('[name="tcampo"]'), {
-        valueField: 'name', labelField: 'name', searchField: 'name', options: tecnicos
-    })
-    Salem.utils.loading()
+    /**
+     * Carga de técnicos delegada al módulo compartido _tecnicos.js.
+     * Estrategia: cache-first + MutationObserver + retry exponencial en background.
+     * El observer espera a que [name="tcampo"] exista en el panel antes de montar TomSelect.
+     */
+    SalemTecnicos.init(panel)
 
+    /**
+     * @description Actualiza el selector de tipos de equipo según la estación seleccionada.
+     * Aplica el filtro activo si existe el campo `filtro` en el formulario.
+     * Se invoca como callback onChange del TomSelect de estaciones.
+     *
+     * @returns {void}
+     */
     function setTipos() {
         let [estacion] = this.items
         let equipos = storage.config.otrs.CMDB.filter(u => u.estacion == estacion).map(fila => {
@@ -46,6 +50,13 @@ $(async () => {
         $('[name="index"]').val('')
     }
 
+    /**
+     * @description Actualiza el selector de equipos individuales según los tipos seleccionados en el filtro de tipo.
+     * Consulta la CMDB filtrada por estación y tipo. Reinicia el selector de índice.
+     * Se invoca como callback onChange del TomSelect de tipos.
+     *
+     * @returns {void}
+     */
     function setEquipos() {
         let tipos = this.items
         let estacion = estacionSelector.getValue()
@@ -60,6 +71,13 @@ $(async () => {
         $('[name="index"]').val('')
     }
 
+    /**
+     * @description Serializa los índices seleccionados en el TomSelect de equipos como JSON
+     * en el campo oculto `[name="index"]` del formulario de creación.
+     * Se invoca como callback onChange del TomSelect de equipos individuales.
+     *
+     * @returns {void}
+     */
     function setIndex() {
         $('[name="index"]').val(JSON.stringify(this.items))
     }

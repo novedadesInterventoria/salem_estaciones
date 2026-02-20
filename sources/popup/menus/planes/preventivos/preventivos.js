@@ -1,7 +1,22 @@
 editorPanel = null
 $(() => {
+    /**
+     * Restaura la CMDB original de estaciones si fue modificada previamente por Fiscalizadores.
+     */
+    if (storage && storage.config && storage.config.otrs && storage.config.otrs.CMDB_ORIGINAL) {
+        storage.config.otrs.CMDB = storage.config.otrs.CMDB_ORIGINAL;
+    }
+
     $('#preventivos [name="modo"]').change(toggleCreateMode)
-    function toggleCreateMode() {
+    /**
+ * @description Conmuta el modo de creación (individual o en bloque) e inyecta el script correspondiente.
+ *
+ * @returns {void}
+ */
+function toggleCreateMode() {
+        if (storage && storage.config && storage.config.otrs && storage.config.otrs.CMDB_ORIGINAL) {
+            storage.config.otrs.CMDB = storage.config.otrs.CMDB_ORIGINAL;
+        }
         let mode = $(this).val()
         Salem.utils.partials.injectScript(`/sources/popup/menus/planes/create/${mode}.js`)
     }
@@ -93,44 +108,74 @@ $(() => {
             </table>`)
             let generados = []
             for (let u of otrsCheckDuplicity) {
-                await Salem.utils.loading({ title: 'Conectando con OTOBO', message: 'Se está solicitando un formulario de ticket nuevo' })
-                let form = await Salem.otrs.ajax({ Action: 'AgentTicketPhone1', transform: 'form' })
-                let completeForm = Salem.otrs.utils.predef.create.estaciones(form, u.cmdb, u.create)
-                await Salem.utils.loading({
-                    title: `Generando tickets`,
-                    message: `<p>Por favor espere mientras se completa la creación de ticket para ${u.cmdb.equipo} ${u.cmdb.name}</p>
-                    <p>Generando ticket ${contador + 1} de ${otrsCheckDuplicity.length}</p>`
-                })
-                let nuevoTicket = await Salem.otrs.ajax(completeForm)
-                let middleware = await Salem.otrs.middleware({ isState: 'NUEVO' }, nuevoTicket)
-                if (middleware) {
-                    await Salem.utils.loading({ title: 'Realizando traza', message: 'Realizando traza de estados' })
-                    let sweep = await Salem.core.runtime.sweepCreate(nuevoTicket, { firma: storage.login.firma, ...data })
-                    if (sweep) {
-                        await Salem.otrs.utils.move(nuevoTicket, 'MANTENIMIENTO PREVENTIVO')
+                if (u.confirm !== 'SI') {
+                    contador++
+                    continue
+                }
 
+                try {
+                    await Salem.utils.loading({ title: 'Conectando con OTOBO', message: 'Se está solicitando un formulario de ticket nuevo' })
+                    let form = await Salem.otrs.ajax({ Action: 'AgentTicketPhone1', transform: 'form' })
+                    if (!form) {
+                        throw new Error(`[preventivos] No se pudo obtener el formulario OTOBO de creación (AgentTicketPhone1) para ${u.cmdb ? u.cmdb.name : 'equipo'}`)
+                    }
 
-                        note.find('tbody').append(`<tr>
-                            <td class="is-otrs">${nuevoTicket.ticket}</td>
-                            <td>${u.cmdb.asunto} ${u.cmdb.ubicacion}</td>
-                            <td class="text-success"><i class="fa-solid fa-circle-check"></i></td>
-                        </tr>`)
-                        generados.push(nuevoTicket.ticket)
+                    let completeForm = Salem.otrs.utils.predef.create.estaciones(form, u.cmdb, u.create)
+                    await Salem.utils.loading({
+                        title: `Generando tickets`,
+                        message: `<p>Por favor espere mientras se completa la creación de ticket para ${u.cmdb.equipo} ${u.cmdb.name}</p>
+                        <p>Generando ticket ${contador + 1} de ${otrsCheckDuplicity.length}</p>`
+                    })
+                    let nuevoTicket = await Salem.otrs.ajax(completeForm)
+                    if (!nuevoTicket || !nuevoTicket.ticket) {
+                        throw new Error(`[preventivos] OTOBO no devolvió información válida después de StoreNew para ${u.cmdb ? u.cmdb.name : 'equipo'}`)
+                    }
 
+                    let middleware = await Salem.otrs.middleware({ isState: 'NUEVO' }, nuevoTicket)
+                    if (middleware) {
+                        await Salem.utils.loading({ title: 'Realizando traza', message: 'Realizando traza de estados' })
+                        let sweep = await Salem.core.runtime.sweepCreate(nuevoTicket, { firma: storage.login.firma, ...data })
+                        if (sweep) {
+                            await Salem.otrs.utils.move(nuevoTicket, 'MANTENIMIENTO PREVENTIVO')
+
+                            note.find('tbody').append(`<tr>
+                                <td class="is-otrs">${nuevoTicket.ticket}</td>
+                                <td>${u.cmdb.asunto} ${u.cmdb.ubicacion}</td>
+                                <td class="text-success"><i class="fa-solid fa-circle-check"></i></td>
+                            </tr>`)
+                            generados.push(nuevoTicket.ticket)
+
+                        }
+                        else {
+                            note.find('tbody').append(`<tr>
+                                <td class="is-otrs">${nuevoTicket.ticket}</td>
+                                <td>${u.cmdb.asunto} ${u.cmdb.ubicacion}</td>
+                                <td class="text-danger"><i class="fa-solid fa-circle-xmark"></i></td>
+                            </tr>`)
+                            generados.push(nuevoTicket.ticket)
+                        }
                     }
                     else {
                         note.find('tbody').append(`<tr>
-                            <td class="is-otrs">${nuevoTicket.ticket}</td>
+                            <td class="text-danger fw-bold"><i class="fa-solid fa-circle-xmark"></i></td>
                             <td>${u.cmdb.asunto} ${u.cmdb.ubicacion}</td>
-                            <td class="text-danger"><i class="fa-solid fa-circle-xmark"></i></td>
+                            <td class="text-danger fw-bold"><i class="fa-solid fa-circle-xmark"></i></td>
                         </tr>`)
-                        generados.push(nuevoTicket.ticket)
                     }
-                }
-                else {
+                } catch (error) {
+                    console.error('Salem :: Error en confirmCreate Preventivos', {
+                        error,
+                        item: u
+                    })
+                    Salem.utils.toast({
+                        title: 'Error en creación',
+                        message: error && error.message ? error.message : 'Ocurrió un error inesperado al generar el ticket.',
+                        type: 'error',
+                        noHide: true
+                    })
                     note.find('tbody').append(`<tr>
                         <td class="text-danger fw-bold"><i class="fa-solid fa-circle-xmark"></i></td>
-                        <td>${u.cmdb.asunto} ${u.cmdb.ubicacion}</td>
+                        <td>${u.cmdb ? `${u.cmdb.asunto} ${u.cmdb.ubicacion}` : 'Error en creación'}</td>
                         <td class="text-danger fw-bold"><i class="fa-solid fa-circle-xmark"></i></td>
                     </tr>`)
                 }
@@ -150,6 +195,11 @@ $(() => {
 })
 
 // Función para cargar automáticamente el plan contractual
+/**
+ * @description Carga y selecciona automáticamente el plan contractual activo en el formulario de preventivos.
+ *
+ * @returns {void}
+ */
 function loadContractualPlan() {
     const planesActive = storage.config.planes.active;
     
@@ -169,6 +219,11 @@ function loadContractualPlan() {
 }
 
 // Modificar tu función changePrevType existente (simplificada)
+/**
+ * @description Actualiza el asunto y el contenedor visual cuando cambia el tipo de plan preventivo.
+ *
+ * @returns {void}
+ */
 function changePrevType() {
     let tipo = $(this).val();
     if (tipo === 'contractual') {
@@ -187,22 +242,32 @@ $(() => {
     $('[name="plan"]').on('change', changePrevType);
 });
 
-function checkDuplicity(package) {
+/**
+ * @description Verifica la existencia de tickets duplicados en OTOBO para la lista de equipos evaluada.
+ *
+ * @param {Array<Object>} packageList - Lista de paquetes con datos de la CMDB y parámetros CREATE por cada equipo.
+ *
+ * @returns {Promise<Array<Object>>} Promesa que resuelve la lista de equipos enriquecida con la propiedad hasDuplicity.
+ */
+function checkDuplicity(packageList) {
+    if (typeof Salem !== 'undefined' && Salem.otrs && Salem.otrs.utils && typeof Salem.otrs.utils.checkDuplicity === 'function') {
+        return Salem.otrs.utils.checkDuplicity(packageList, typeof storage !== 'undefined' ? storage : null);
+    }
     return new Promise(async resolve => {
-        let res = []
-        for (let u of package) {
+        let res = [];
+        for (let u of packageList) {
             await Salem.utils.loading({
                 title: 'Verificando duplicidad',
                 message: `Se está verificando duplicidad para el equipo ${u.cmdb.equipo} ${u.cmdb.name} de ${u.cmdb.estacion}`
-            })
-            let search = null
-            search = storage.config.utils.checkDuplicity
-            search.Search_DynamicField_IDEQUIPO = u.cmdb.name
-            search.Title = `"${u.cmdb.asunto}"`
-            search.ServiceIDs = [u.create.service_id]
-            let hasDuplicity = await Salem.otrs.ajax(search)
-            res.push({ ...u, hasDuplicity })
+            });
+            let baseSearch = storage && storage.config && storage.config.utils && storage.config.utils.checkDuplicity;
+            let search = baseSearch ? { ...baseSearch } : {};
+            search.Search_DynamicField_IDEQUIPO = u.cmdb.name;
+            search.Title = `"${u.cmdb.asunto}"`;
+            search.ServiceIDs = [u.create.service_id];
+            let hasDuplicity = await Salem.otrs.ajax(search);
+            res.push({ ...u, hasDuplicity: hasDuplicity || [] });
         }
-        resolve(res)
-    })
+        resolve(res);
+    });
 }

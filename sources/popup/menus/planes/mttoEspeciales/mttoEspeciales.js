@@ -1,4 +1,10 @@
 window.mttoEspecialesModule = {
+    /**
+     * @description Inicializa el módulo de mantenimientos especiales, configurando los selectores de estación,
+     * técnicos, hora local por defecto, toggle de progreso y el manejador de envío con control de duplicidad.
+     *
+     * @returns {void}
+     */
     init: function () {
         let editorPanel = null
         let idSelector = null
@@ -20,25 +26,30 @@ window.mttoEspecialesModule = {
                 onChange: setEquipos
             })
 
-            // Obtener técnicos disponibles
-            await Salem.utils.loading({ title: 'Obteniendo técnicos', message: 'Se está consultando el listado de técnicos disponibles en OTOBO.' })
-            let queryAjax = await Salem.otrs.ajax({ Action: 'AgentTicketNote', Subaction: 'AJAXUpdate', ElementChanged: 'DynamicField_QUIENGESTIONA', TicketID: '943890', transform: 'json' })
-            let tecnicos = queryAjax.DynamicField_QUIENGESTIONA.map(u => {
-                return { name: u[0] }
-            })
-            new TomSelect($('[name="tcampo"]')[0], {
-                valueField: 'name',
-                labelField: 'name',
-                searchField: 'name',
-                options: tecnicos
-            })
+            /**
+             * Carga de técnicos delegada al módulo compartido _tecnicos.js.
+             * Estrategia: cache-first + MutationObserver + retry exponencial en background.
+             */
+            SalemTecnicos.init($('#mttoEspeciales'))
 
-            // Inicializar el editor siempre
+            // [REQ 2] Auto-rellenar hora actual del PC al inicializar el módulo
+            const ahoraInit = new Date()
+            const hhInit = String(ahoraInit.getHours()).padStart(2, '0')
+            const mmInit = String(ahoraInit.getMinutes()).padStart(2, '0')
+            $('[name="hora"]').val(`${hhInit}:${mmInit}`)
+
+            // [REQ 3] Editor (plantilla) VISIBLE POR DEFECTO al abrir el módulo.
+            // Inicializar el editor siempre visible (listo para usar o copiar)
             editorPanel = await ClassicEditor.create($('div#editor')[0], { placeholder: 'Ingrese la plantilla del técnico aquí.' })
 
             Salem.utils.loading()
 
             // Función para configurar equipos basado en la estación seleccionada
+            /**
+             * @description Filtra y actualiza el selector de equipos basado en la estación seleccionada.
+             *
+             * @returns {void}
+             */
             function setEquipos() {
                 let [estacion] = this.items
                 let equipos = storage.config.otrs.CMDB.filter(u => u.estacion == estacion).map(fila => {
@@ -63,6 +74,11 @@ window.mttoEspecialesModule = {
             }
 
             // Función para establecer el costado basado en el equipo seleccionado
+            /**
+             * @description Establece el costado y el índice del equipo seleccionado en los campos del formulario.
+             *
+             * @returns {void}
+             */
             function setCostado() {
                 let [index] = this.items
                 let registro = storage.config.otrs.CMDB.find(u => u.index == index)
@@ -230,6 +246,11 @@ window.mttoEspecialesModule = {
             $('[name="plan"]').on('change', changePrevType)
         })
 
+        /**
+         * @description Actualiza el asunto y la vista previa del plan cuando cambia el tipo de mantenimiento.
+         *
+         * @returns {void}
+         */
         function changePrevType() {
             let tipo = $(this).val()
             $('input[name="asunto"]').val(storage.config.planes.active[tipo])
@@ -237,25 +258,35 @@ window.mttoEspecialesModule = {
             $('[data-tag="plan"]').text(storage.config.planes.active[tipo])
         }
 
-        function checkDuplicity(package) {
-            return new Promise(async resolve => {
-                let res = []
-                for (let u of package) {
-                    await Salem.utils.loading({
-                        title: 'Verificando duplicidad',
-                        message: `Se está verificando duplicidad para el equipo ${u.cmdb.equipo} ${u.cmdb.name} de ${u.cmdb.estacion}`
-                    })
-                    let search = null
-                    search = storage.config.utils.checkDuplicity
-                    search.Search_DynamicField_IDEQUIPO = u.cmdb.name
-                    search.Title = `"${u.cmdb.asunto}"`
-                    search.ServiceIDs = [u.create.service_id]
-                    let hasDuplicity = await Salem.otrs.ajax(search)
-                    res.push({ ...u, hasDuplicity })
-                }
-                resolve(res)
-            })
+        /**
+ * @description Verifica la existencia de tickets duplicados en OTOBO para la lista de equipos evaluada.
+ *
+ * @param {Array<Object>} packageList - Lista de paquetes con datos de la CMDB y parámetros CREATE por cada equipo.
+ *
+ * @returns {Promise<Array<Object>>} Promesa que resuelve la lista de equipos enriquecida con la propiedad hasDuplicity.
+ */
+function checkDuplicity(packageList) {
+    if (typeof Salem !== 'undefined' && Salem.otrs && Salem.otrs.utils && typeof Salem.otrs.utils.checkDuplicity === 'function') {
+        return Salem.otrs.utils.checkDuplicity(packageList, typeof storage !== 'undefined' ? storage : null);
+    }
+    return new Promise(async resolve => {
+        let res = [];
+        for (let u of packageList) {
+            await Salem.utils.loading({
+                title: 'Verificando duplicidad',
+                message: `Se está verificando duplicidad para el equipo ${u.cmdb.equipo} ${u.cmdb.name} de ${u.cmdb.estacion}`
+            });
+            let baseSearch = storage && storage.config && storage.config.utils && storage.config.utils.checkDuplicity;
+            let search = baseSearch ? { ...baseSearch } : {};
+            search.Search_DynamicField_IDEQUIPO = u.cmdb.name;
+            search.Title = `"${u.cmdb.asunto}"`;
+            search.ServiceIDs = [u.create.service_id];
+            let hasDuplicity = await Salem.otrs.ajax(search);
+            res.push({ ...u, hasDuplicity: hasDuplicity || [] });
         }
+        resolve(res);
+    });
+}
     }
 }
 

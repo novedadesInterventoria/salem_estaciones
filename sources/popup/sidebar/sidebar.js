@@ -14,6 +14,16 @@ $(async () => {
 
 $('[data-tag="salemSidebarToggle"]').click(salemSidebarToggle)
 salemSidebarToggle(null, true)
+/**
+ * @description Alterna la visibilidad del panel de navegación lateral (sidebar) de Salem.
+ * Si el storage no está disponible, redirige al login. En modo automático (`isAuto = true`),
+ * respeta el estado guardado en memoria sin invertirlo.
+ *
+ * @param {MouseEvent|null} event  - Evento de clic del botón toggle, o null en la invocación automática al iniciar.
+ * @param {boolean}         isAuto - Indica si la invocación es automática (al cargar la página) o por acción del usuario.
+ *
+ * @returns {Promise<void>}
+ */
 async function salemSidebarToggle(event, isAuto) {
     let storage = await Salem.core.mem.get()
     if (typeof storage == 'undefined') {
@@ -33,15 +43,21 @@ async function salemSidebarToggle(event, isAuto) {
     await Salem.core.mem.set(storage)
 }
 
+/**
+ * @description Carga el panel solicitado y restaura la CMDB original si se navega fuera de fiscalizadores.
+ *
+ * @param {string} [panel] - Identificador del panel a cargar. Si se omite, utiliza el panel por defecto configurado en el login del usuario.
+ *
+ * @returns {Promise<void>}
+ */
 async function setPreferPanel(panel) {
     try {
         $('.notify__close').click()
-        if (typeof panel == 'undefined') {
-            await Salem.utils.partials.getSetPanel(storage.login.config.defaultPanel)
+        let targetPanel = typeof panel == 'undefined' ? storage.login.config.defaultPanel : panel;
+        if (targetPanel !== 'fiscalizadores' && storage && storage.config && storage.config.otrs && storage.config.otrs.CMDB_ORIGINAL) {
+            storage.config.otrs.CMDB = storage.config.otrs.CMDB_ORIGINAL;
         }
-        else {
-            await Salem.utils.partials.getSetPanel(panel)
-        }
+        await Salem.utils.partials.getSetPanel(targetPanel)
     } catch (error) {
         await Salem.utils.partials.getSetPanel('error')
     }

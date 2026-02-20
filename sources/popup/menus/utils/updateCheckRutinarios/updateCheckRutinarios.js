@@ -55,11 +55,22 @@ $(() => {
     // Inicialización
     init();
 
+    /**
+     * @description Inicializa el módulo de consulta y control de mantenimientos rutinarios.
+     * Carga los datos del backend y vincula los escuchadores de eventos.
+     *
+     * @returns {void}
+     */
     function init() {
         loadRutinarios();
         setupEventListeners();
     }
 
+    /**
+     * @description Configura todos los eventos interactivos del DOM (filtros, búsqueda, descarga y selección de filas).
+     *
+     * @returns {void}
+     */
     function setupEventListeners() {
         $('#equipoSelect').on('change', handleEquipoChange);
         $('#searchInput').on('input', handleSearch);
@@ -205,6 +216,15 @@ $(() => {
         loadEquipoData(equipoData, columns, equipoKey);
     }
 
+    /**
+     * @description Carga y normaliza los datos del equipo seleccionado en el estado local de rutinarios.
+     *
+     * @param {Array<Object>} data      - Filas de datos del equipo.
+     * @param {Array<string>} columns   - Nombres de las columnas.
+     * @param {string}        equipoKey - Identificador del tipo de equipo (ej. 'rack', 'bca', 'tca').
+     *
+     * @returns {void}
+     */
     function loadEquipoData(data, columns, equipoKey) {
         state.currentData = data;
         state.currentColumns = columns.length > 0 ? columns : (data.length > 0 ? Object.keys(data[0]) : []);
@@ -224,6 +244,11 @@ $(() => {
         loadKPIs();
     }
 
+    /**
+     * @description Filtra los registros de la tabla según el término ingresado en el buscador en tiempo real.
+     *
+     * @returns {void}
+     */
     function handleSearch() {
         const searchTerm = $(this).val().toLowerCase().trim();
 
@@ -242,6 +267,11 @@ $(() => {
         updateSearchResults(filteredData.length, searchTerm);
     }
 
+    /**
+     * @description Limpia el campo de búsqueda y dispara su evento input para restaurar todos los registros.
+     *
+     * @returns {void}
+     */
     function clearSearch() {
         $('#searchInput').val('').trigger('input');
     }
@@ -268,6 +298,13 @@ $(() => {
         });
     }
 
+    /**
+     * @description Filtra los datos actuales comparando el término de búsqueda con todas las columnas.
+     *
+     * @param {string} searchTerm - Término de búsqueda en minúsculas.
+     *
+     * @returns {Array<Object>} Registros que coinciden con la búsqueda.
+     */
     function filterData(searchTerm) {
         return state.currentData.filter(row =>
             state.currentColumns.some(col => {
@@ -293,6 +330,13 @@ $(() => {
         });
     }
 
+    /**
+     * @description Renderiza las filas en el cuerpo de la tabla aplicando estilos de selección persistente.
+     *
+     * @param {Array<Object>} data - Registros a renderizar.
+     *
+     * @returns {void}
+     */
     function renderTable(data) {
         const tbody = $('#rutinariosTableBody');
         tbody.empty();
@@ -315,6 +359,14 @@ $(() => {
         });
     }
 
+    /**
+     * @description Genera el contenido HTML seguro para una celda de la tabla según la columna.
+     *
+     * @param {string} columnName - Nombre de la columna.
+     * @param {*}      value      - Valor de la celda.
+     *
+     * @returns {string} Fragmento HTML de la celda <td>.
+     */
     function createTableCell(columnName, value) {
         const colUpper = columnName.toUpperCase();
         const safeValue = escapeHtml(value || '');
@@ -327,6 +379,13 @@ $(() => {
         return `<td>${safeValue}</td>`;
     }
 
+    /**
+     * @description Muestra una fila de aviso en la tabla cuando no hay registros o tras una búsqueda sin resultados.
+     *
+     * @param {string} message - Mensaje explicativo a mostrar.
+     *
+     * @returns {void}
+     */
     function showEmptyState(message) {
         const tbody = $('#rutinariosTableBody');
         const colspan = state.currentColumns.length || 10;
@@ -360,11 +419,25 @@ $(() => {
         return CONFIG.estadoBadges.default;
     }
 
+    /**
+     * @description Capitaliza el primer carácter de una cadena y normaliza el resto a minúsculas.
+     *
+     * @param {string} str - Texto a capitalizar.
+     *
+     * @returns {string} Texto formateado.
+     */
     function capitalizeFirst(str) {
         if (!str) return '';
         return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     }
 
+    /**
+     * @description Sanitiza una cadena escapando caracteres especiales HTML para prevenir inyección XSS.
+     *
+     * @param {string} text - Texto a sanitizar.
+     *
+     * @returns {string} Texto seguro.
+     */
     function escapeHtml(text) {
         const map = {
             '&': '&amp;',
@@ -376,6 +449,11 @@ $(() => {
         return String(text).replace(/[&<>"']/g, m => map[m]);
     }
 
+    /**
+     * @description Restaura el estado local del módulo de rutinarios a sus valores vacíos iniciales.
+     *
+     * @returns {void}
+     */
     function resetState() {
         state.currentEquipo = '';
         state.currentData = [];
@@ -383,6 +461,11 @@ $(() => {
         updateRecordCount(0);
     }
 
+    /**
+     * @description Limpia el contenedor de gráficos KPI y destruye las instancias activas de Chart.js.
+     *
+     * @returns {void}
+     */
     function clearKPIs() {
         // Limpiar el contenedor de KPIs
         const container = $('#kpisContainer');
@@ -398,6 +481,14 @@ $(() => {
         state.kpisData = null;
     }
 
+    /**
+     * @description Actualiza el contador de registros en la interfaz visual.
+     *
+     * @param {number}      current      - Cantidad de registros actualmente mostrados.
+     * @param {number|null} [total=null] - Cantidad total de registros en el conjunto.
+     *
+     * @returns {void}
+     */
     function updateRecordCount(current, total = null) {
         const text = total !== null
             ? `Mostrando ${current} de ${total} registros`
@@ -405,6 +496,14 @@ $(() => {
         $('#recordCount').text(text);
     }
 
+    /**
+     * @description Actualiza el mensaje informativo con la cantidad de resultados de búsqueda encontrados.
+     *
+     * @param {number} resultCount - Cantidad de coincidencias.
+     * @param {string} searchTerm  - Término de búsqueda aplicado.
+     *
+     * @returns {void}
+     */
     function updateSearchResults(resultCount, searchTerm) {
         const resultsInfo = $('#resultsInfo');
         const resultsText = $('#resultsText');
@@ -543,6 +642,13 @@ $(() => {
     }
 
 
+    /**
+     * @description Procesa y almacena los datos de KPI provenientes de la respuesta del cálculo o API.
+     *
+     * @param {Object} apiResponse - Objeto con la respuesta y matriz de datos.
+     *
+     * @returns {boolean} Verdadero si los datos fueron validados y cargados exitosamente.
+     */
     function loadKPIData(apiResponse) {
         if (!apiResponse || !apiResponse.data) return false;
 
@@ -560,6 +666,11 @@ $(() => {
         return true;
     }
 
+    /**
+     * @description Renderiza las tarjetas y lienzos canvas para cada tipo de equipo con datos de KPI.
+     *
+     * @returns {void}
+     */
     function renderKPICharts() {
         const container = $('#kpisContainer');
         container.empty();
@@ -634,6 +745,15 @@ $(() => {
         });
     }
 
+    /**
+     * @description Crea un gráfico de pastel de Chart.js con la distribución de ejecutados, en progreso y habilitados.
+     *
+     * @param {string}       canvasId  - ID del canvas destino.
+     * @param {string}       equipoKey - Identificador del equipo.
+     * @param {Array<Array>} data      - Matriz de métricas del equipo.
+     *
+     * @returns {void}
+     */
     function createPieChart(canvasId, equipoKey, data) {
         const kpiData = parseEquipoKPIData(data);
 
@@ -687,6 +807,13 @@ $(() => {
         updateChartStats(equipoKey, kpiData);
     }
 
+    /**
+     * @description Extrae los valores enteros de métricas de KPI para un equipo (total, pendientes, en progreso, realizados).
+     *
+     * @param {Array<Array>} data - Matriz con filas [etiqueta, valor].
+     *
+     * @returns {{ total: number, pendientes: number, enProgreso: number, realizados: number }|null}
+     */
     function parseEquipoKPIData(data) {
         if (!Array.isArray(data) || data.length < 4) return null;
 
@@ -698,6 +825,14 @@ $(() => {
         return { total, pendientes, enProgreso, realizados };
     }
 
+    /**
+     * @description Actualiza la tarjeta de estadísticas numéricas y la barra de avance porcentual bajo el gráfico.
+     *
+     * @param {string} equipoKey - Identificador del equipo.
+     * @param {Object} kpiData   - Objeto con las métricas cuantitativas.
+     *
+     * @returns {void}
+     */
     function updateChartStats(equipoKey, kpiData) {
         const { total, pendientes, enProgreso, realizados } = kpiData;
         const percentage = total > 0 ? ((realizados / total) * 100).toFixed(1) : 0;
@@ -937,12 +1072,13 @@ $(() => {
     // ========== REPORT FUNCTIONALITY ==========
 
     /**
-     * Abre el modal de reporte de novedades.
-     * Carga el parcial HTML, lo inserta en el DOM y maneja el ciclo de vida del modal.
+     * @description Abre el modal de reporte de novedades.
+     * Carga el parcial HTML desde la ruta de panel configurada, lo inserta en el DOM
+     * y gestiona el ciclo de vida del modal con CKEditor, mensajes rápidos y envío de formulario.
+     *
+     * @returns {Promise<void>}
      */
     async function openReportModal() {
-        // Reutiliza la utilidad de parciales de Salem
-        // FIX: Se debe pasar un objeto vacío como segundo argumento para evitar error en Object.keys
         const reportModalHtml = await Salem.utils.partials.get(Salem.rules.routes.panels.report.view, {});
         $('body').append(reportModalHtml);
 
@@ -1304,6 +1440,18 @@ $(() => {
         });
 
         // 3. Tablas de Estadísticas con fila de TOTALES
+        /**
+         * @description Dibuja una tabla estilizada de estadísticas en la hoja de Excel con encabezados,
+         * formatos numéricos porcentuales y bordes temáticos.
+         *
+         * @param {number}        startRow - Fila inicial en la hoja de Excel.
+         * @param {number}        startCol - Columna inicial numérica (1 = A).
+         * @param {string}        title    - Título del bloque de tabla.
+         * @param {Array<string>} headers  - Encabezados de columnas.
+         * @param {Array<Array>}  dataRows - Filas de valores a escribir.
+         *
+         * @returns {void}
+         */
         const drawTable = (startRow, startCol, title, headers, dataRows) => {
             const headerRange = `${String.fromCharCode(64 + startCol)}${startRow}:${String.fromCharCode(64 + startCol + headers.length - 1)}${startRow}`;
             ws.mergeCells(headerRange);

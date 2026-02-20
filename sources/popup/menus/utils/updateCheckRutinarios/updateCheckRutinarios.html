@@ -1,0 +1,116 @@
+<form id="updateCheckRutinarios" class="sheet-view-container" autocomplete="off">
+
+
+    <div class="sheet-card mb-1">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <div class="fw-semibold text-dark">
+                    <i class="fas fa-info-circle me-1"></i> Consultar Mantenimientos Rutinarios
+                </div>
+                <small class="text-muted">
+                    Visualice y filtre los mantenimientos rutinarios por tipo de equipo.
+                </small>
+            </div>
+            <button type="button" class="btn btn-novedad" id="btnOpenReport">
+                <i class="fas fa-envelope"></i> Reportar Novedad
+            </button>
+        </div>
+
+        <!-- Controles de filtrado -->
+        <div class="sheet-toolbar row g-2">
+            <div class="col-sm-4 col-12">
+                <label for="equipoSelect" class="form-label">
+                    <i class="fas fa-filter me-1"></i> Tipo de Equipo
+                </label>
+                <select class="form-select form-select-sm" id="equipoSelect">
+                    <option value="">Seleccione un equipo...</option>
+                    <option value="rack">1. RACK</option>
+                    <option value="bca">2. BCA</option>
+                    <option value="tca">3. TCA</option>
+                </select>
+            </div>
+            <div class="col-sm-5 col-12">
+                <label class="form-label">
+                    <i class="fas fa-search me-1"></i> Búsqueda en hoja
+                </label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" class="form-control" id="searchInput" placeholder="Filtrar...">
+                    <button class="btn btn-outline-secondary" type="button" id="clearSearch" title="Limpiar búsqueda">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-sm-3 col-12">
+                <label class="form-label">
+                    <i class="fas fa-download me-1"></i> Descargar
+                </label>
+                <button type="button" class="btn btn-success btn-sm w-100" id="downloadRutinarios">
+                    <i class="fas fa-file-excel me-1"></i> Pendientes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información de resultados -->
+    <div class="alert alert-info d-none" id="resultsInfo" role="alert">
+        <i class="fas fa-info-circle"></i>
+        <span id="resultsText"></span>
+    </div>
+
+
+    <!-- Tabla tipo hoja de cálculo -->
+    <div class="sheet-wrapper">
+        <div class="sheet-header">
+            <div class="sheet-header-title">
+                <i class="fas fa-table"></i>
+                <span>Hoja de rutinarios</span>
+                <small class="d-none d-sm-inline" id="recordCount">Total de registros: 0</small>
+            </div>
+        </div>
+        <div class="sheet-body">
+            <table class="table table-sm table-hover table-bordered" id="rutinariosTable">
+                <thead class="table-dark">
+                    <tr id="tableHeaders">
+                        <!-- Los encabezados se insertarán dinámicamente desde JavaScript -->
+                    </tr>
+                </thead>
+                <tbody id="rutinariosTableBody">
+                    <tr>
+                        <td colspan="10" class="text-center text-muted py-4">
+                            <i class="fas fa-hand-pointer fa-2x mb-2"></i><br>
+                            Seleccione un tipo de equipo para ver los datos.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Contador de registros para pantallas pequeñas -->
+    <div class="mt-1 d-sm-none">
+        <small class="text-muted" id="recordCountMobile">Total de registros: 0</small>
+    </div>
+
+    <!-- KPIs Dashboard -->
+    <div class="sheet-card mb-3" id="kpisDashboard">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="fw-bold text-dark d-flex align-items-center" style="font-size: 1.1rem;">
+                <img src="../../../../../icons/salem_64x64.png" alt="Salem" class="me-2"
+                    style="width: 32px; height: 32px;">
+                <span>Dashboard General de Gestión - Rutinarios</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="toggleKPIs">
+                <i class="fas fa-sync-alt me-1"></i> Actualizar KPIs
+            </button>
+        </div>
+
+        <div class="row g-3" id="kpisContainer">
+            <!-- Los gráficos se insertarán dinámicamente aquí -->
+        </div>
+    </div>
+
+
+</form>

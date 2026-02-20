@@ -1,0 +1,178 @@
+/*  Estilos de alertas de Swal */
+.swal2-success-circular-line-left {
+    background-color: transparent !important;
+}
+
+.swal2-success-fix {
+    background-color: transparent !important;
+}
+
+.swal2-success-circular-line-right {
+    background-color: transparent !important;
+}
+
+.swal2-html-container *,
+.swal2-html-container::after,
+.swal2-html-container::before {
+    box-sizing: border-box !important;
+}
+
+.no-margin {
+    margin: 0 !important;
+    width: 100%;
+}
+
+/* Layout tipo hoja de cálculo generalizado */
+.sheet-view-container {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    height: 100%;
+}
+
+.sheet-view-container .sheet-card {
+    border-radius: .35rem;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .04);
+    background: #ffffff;
+    padding: .75rem .75rem .5rem;
+}
+
+.sheet-view-container .sheet-toolbar {
+    margin-bottom: .25rem;
+}
+
+.sheet-view-container .sheet-toolbar .form-label {
+    margin-bottom: 0;
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+.sheet-view-container .sheet-toolbar .input-group,
+.sheet-view-container .sheet-toolbar select {
+    font-size: .8rem;
+}
+
+.sheet-view-container .sheet-wrapper {
+    border-radius: .35rem;
+    border: 1px solid #dee2e6;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 220px;
+    max-height: 380px;
+}
+
+.sheet-view-container .sheet-header {
+    padding: .35rem .5rem;
+    background: linear-gradient(90deg, #343a40, #495057);
+    color: #f8f9fa;
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sheet-view-container .sheet-header-title {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-weight: 600;
+}
+
+.sheet-view-container .sheet-header-title small {
+    font-weight: 400;
+    opacity: .85;
+}
+
+.sheet-view-container .sheet-body {
+    flex: 1;
+    overflow: auto;
+    background: #f8f9fa;
+}
+
+.sheet-view-container table {
+    margin-bottom: 0;
+    font-size: .78rem;
+    white-space: nowrap;
+}
+
+.sheet-view-container table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #343a40;
+    color: #f8f9fa;
+    border-bottom: 1px solid #212529;
+}
+
+.sheet-view-container table tbody tr:nth-child(even) {
+    background-color: #f1f3f5;
+}
+
+.sheet-view-container table tbody tr:hover {
+    background-color: #ffe8a1;
+}
+
+.sheet-view-container table td,
+.sheet-view-container table th {
+    padding: .35rem .5rem;
+    vertical-align: middle;
+}
+
+.sheet-view-container table td {
+    border-color: #dee2e6;
+}
+
+.sheet-view-container table .badge {
+    font-size: .7rem;
+    padding: .2em .45em;
+}
+
+.sheet-view-container #resultsInfo {
+    padding: .25rem .5rem;
+    font-size: .75rem;
+    margin-bottom: .25rem;
+}
+
+.sheet-view-container #recordCount {
+    font-size: .75rem;
+}
+
+/* Botón Reportar Novedad Estilizado */
+.btn-novedad {
+    border-radius: 50px !important;
+    font-weight: 600 !important;
+    text-transform: none;
+    font-size: 0.75rem !important;
+    padding: 0.4rem 1.1rem !important;
+    background: linear-gradient(135deg, #ffca28 0%, #f57c00 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 3px 10px rgba(245, 124, 0, 0.3) !important;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+
+.btn-novedad:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 18px rgba(245, 124, 0, 0.45) !important;
+    background: linear-gradient(135deg, #ffd54f 0%, #fb8c00 100%) !important;
+    color: #ffffff !important;
+}
+
+.btn-novedad:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-novedad i {
+    font-size: 1rem;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
+}

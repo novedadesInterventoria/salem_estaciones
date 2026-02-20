@@ -1,0 +1,32 @@
+<form id="preventivos" autocomplete="off">
+    <input type="text" class="d-none" name="index" readonly >
+    <input type="text" class="d-none" name="asunto" readonly >
+    <small class="text-muted d-none" data-tag="planContainer">La utilidad de generación de tickets será habilitada para el  
+        <code data-tag="plan" class="fw-semibold"></code>. <br>¿No es el plan requerido? Sincroniza datos de Salem.
+    </small>
+    <div class="row mt-3">
+        <div class="col col-6 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-filter"></i>Tipo
+                </span>
+                <select class="form-select" name="plan" required>
+                    <option value="contractual">PLAN MTTO PREVENTIVO</option>
+                </select>
+            </div>
+        </div>
+        <div class="col col-6 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-bug"></i>Modo
+                </span>
+                <select class="form-select" name="modo" data-action="toggle">
+                    <option value="" selected="" disabled=""></option>
+                    <option value="simple">Individual</option>
+                    <option value="bulk">Bloque</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div id="create"></div>
+</form>

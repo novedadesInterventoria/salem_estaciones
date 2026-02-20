@@ -1,0 +1,176 @@
+
+@import url(/sources/vendor/css/bootstrap.min.css);
+@import url(/sources/vendor/css/all.min.css);
+@import url(/sources/vendor/css/notify.css);
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif
+}
+
+.login-card{
+    border-radius: 35px !important;
+}
+
+.container{
+    max-width: 800px;
+}
+
+.glass {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    margin: 0px;
+    border: 1px solid #dddd;
+    border-radius: 0px;
+    overflow: hidden;
+    box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+}
+
+.btn-primary{
+    background-color: #381D40 !important;
+    border: none;
+}
+
+.btn-primary:hover{
+    background-color: #ffcc66 !important;
+    color: rgb(32, 32, 32)
+}
+
+.box-1 img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.box-2 {
+    padding: 10px;
+}
+
+.box-1,
+.box-2 {
+    width: 50%;
+}
+
+.h-1 {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.text-muted {
+    font-size: 14px;
+}
+
+.container .box {
+    width: 100px;
+    height: 100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid transparent;
+    text-decoration: none;
+    color: #615f5fdd;
+}
+
+.box:active,
+.box:visited {
+    border: 2px solid #504dff;
+}
+
+.box:hover {
+    border: 2px solid #504dff;
+}
+
+.footer .p-color {
+    color: #504dff;
+}
+
+.footer.text-muted {
+    font-size: 10px;
+}
+
+.fas.fa-times {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    height: 20px;
+    width: 20px;
+    background-color: #f3cff379;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fas.fa-times:hover {
+    color: #ff0000;
+}
+
+@media (max-width:767px) {
+    body {
+        padding: 10px;
+    }
+
+    .glass {
+        width: 100%;
+        height: 100%;
+    }
+
+    .box-1 {
+        width: 100%;
+    }
+
+    .box-2 {
+        width: 100%;
+        height: 440px;
+    }
+}
+
+body {
+	background: linear-gradient(-35deg, #5317644c, #028edd, #9d02ff4c, #ffcc66);
+	background-size: 400% 400%;
+	animation: gradient 12s ease infinite;
+	height: 100vh;
+    overflow: hidden;
+}
+
+@keyframes gradient {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+.btn.glass:hover, .btn.glass.btn-active {
+    --glass-opacity: 25%;
+    --glass-border-opacity: 15%;
+}
+.glass, .glass:hover, .glass.btn-active {
+    border: none;
+    -webkit-backdrop-filter: blur(var(--glass-blur,40px));
+    backdrop-filter: blur(var(--glass-blur,40px));
+    background-color: transparent;
+    background-image: linear-gradient(135deg,rgb(255 255 255/var(--glass-opacity,30%)) 0%,rgb(0 0 0/0%) 100%),linear-gradient(var(--glass-reflex-degree,100deg),rgb(255 255 255/var(--glass-reflex-opacity,10%)) 25%,rgb(0 0 0/0%) 25%);
+    box-shadow: 0 0 0 1px rgb(255 255 255/var(--glass-border-opacity,10%)) inset,0 0 0 2px #0000000d;
+    text-shadow: 0 1px rgb(0 0 0/var(--glass-text-shadow-opacity,5%));
+}
+
+button i {
+    margin-right: 5px;
+}
+
+.form-select:focus, .form-control:focus {
+    color: #212529;
+    background-color: #fff;
+    border-color: #8d86fe91;
+    outline: 0;
+    box-shadow: 0 0 0 0.1rem rgb(116 13 253 / 25%);
+}

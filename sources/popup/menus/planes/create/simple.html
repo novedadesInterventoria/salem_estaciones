@@ -1,0 +1,65 @@
+<div class="alert alert-primary" data-tag="createPanel">
+    <div class="row">
+        <small class="text-muted mb-3">Panel de creación de tickets de forma individual</small>
+        <div class="col col-12 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-location-arrow"></i>Estación
+                </span>
+                <select class="form-select" name="estacion" placeholder="Busque y seleccione" required></select>
+            </div>
+        </div>
+        <div class="col col-12 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-hashtag"></i>ID Equipo
+                </span>
+                <select class="form-select" name="id" placeholder="Busque y seleccione" required></select>
+            </div>
+        </div>
+        <div class="col col-12 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-compass"></i>Costado
+                </span>
+                <input type="text" class="form-control" name="costado" tabindex="-1" readonly required>
+            </div>
+        </div>
+        <div class="col col-12 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-hard-hat"></i>Tcampo
+                </span>
+                <select class="form-select" name="tcampo" required></select>
+            </div>
+        </div>
+        <div class="col col-6 mb-3">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-broom"></i>¿Progresar ticket?
+                </span>
+                <select class="form-select" name="progresar" required>
+                    <option value=""></option>
+                    <option value="SI">SI</option>
+                    <option value="NO">NO</option>
+                </select>
+            </div>
+        </div>
+        <div class="col col-6 mb-3 d-none">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-clock"></i>Hora progreso
+                </span>
+                <input type="time" class="form-control" name="hora" required>
+            </div>
+        </div>
+    </div>
+    <div data-tag="editorPanel">
+        <div id="editor"></div>
+    </div>
+    <div class="row mt-3">
+        <div class="col col-auto">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i>Generar</button>
+        </div>
+    </div>
+</div>

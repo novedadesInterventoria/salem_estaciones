@@ -1,0 +1,150 @@
+<form id="closeTickets" autocomplete="off">
+    <!-- Información del ticket -->
+    <div class="row g-3">
+        <div class="col-12">
+            <label class="form-label fw-semibold">
+                <i class="fa-solid fa-pen-alt me-2 text-primary"></i>Título
+            </label>
+            <input type="text" class="form-control" name="rotulo" readonly required>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">
+                <i class="fa-solid fa-mobile me-2 text-info"></i>Equipo
+            </label>
+            <input type="text" class="form-control" name="equipo" readonly required>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">
+                <i class="fa-solid fa-location-arrow me-2 text-danger"></i>Ubicación
+            </label>
+            <input type="text" class="form-control" name="ubicacion" readonly required>
+        </div>
+    </div>
+
+    <!-- Editor de contenido -->
+    <div class="mt-4">
+        <label class="form-label fw-semibold">
+            <i class="fa-solid fa-file-lines me-2 text-success"></i>Nota de cierre
+        </label>
+        <div id="closeEditor"></div>
+    </div>
+
+    <!-- Información adicional -->
+    <div class="row g-3 mt-3">
+        <div class="col-12">
+            <label class="form-label fw-semibold">
+                <i class="fa-solid fa-bug me-2 text-warning"></i>Tipo de falla
+            </label>
+            <input type="text" class="form-control" name="falla" readonly required>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">
+                <i class="fa-solid fa-hard-hat me-2 text-primary"></i>Técnico de campo
+            </label>
+            <input type="text" class="form-control" name="tcampo" required>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">
+                <i class="fa-solid fa-clock me-2 text-info"></i>Hora de cierre
+            </label>
+            <input type="time" class="form-control" name="hora" required>
+        </div>
+    </div>
+
+    <!-- Evidencias -->
+    <div class="row file-upload-section mt-4">
+        <div class="col-12">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">
+                    <i class="fa-solid fa-paperclip me-2 text-secondary"></i>Adjuntos
+                </label>
+                <input class="form-control" type="file" multiple />
+            </div>
+        </div>
+    </div>
+
+    <!-- Cambio de parte -->
+    <div class="mt-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">
+                    <i class="fa-solid fa-screwdriver-wrench me-2 text-warning"></i>¿Cambio de parte?
+                </label>
+                <select class="form-select" name="parte" required>
+                    <option value="NO" selected>No</option>
+                    <option value="SI">Sí</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Contenedor de partes -->
+        <div id="partesWrapper" class="d-none mt-3">
+            <div class="card border-primary">
+                <div class="card-header bg-primary bg-opacity-10">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="fa-solid fa-cogs me-2"></i>Partes reemplazadas
+                        </h6>
+                        <button type="button" id="btnAddParte" class="btn btn-sm btn-primary">
+                            <i class="fa-solid fa-plus me-1"></i>Agregar parte
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="listaPartes"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botón de envío -->
+    <div class="mt-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-paper-plane me-2"></i>Cerrar ticket
+        </button>
+    </div>
+</form>
+
+<!-- Template para cada parte (oculto) -->
+<div id="parteTemplate" class="d-none">
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-cog me-1"></i>Parte
+                    </label>
+                    <select class="form-select" data-field="parte" required>
+                        <option value="" disabled selected>Cargando opciones...</option>
+                    </select>
+                </div>
+
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-plus-circle me-1 text-success"></i>Serial instalado
+                    </label>
+                    <input type="text" class="form-control" data-field="serial-instalado" placeholder="Serial nuevo">
+                </div>
+
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label fw-semibold">
+                        <i class="fa-solid fa-minus-circle me-1 text-danger"></i>Serial retirado
+                    </label>
+                    <input type="text" class="form-control" data-field="serial-retirado" placeholder="Serial anterior">
+                </div>
+
+                <input type="hidden" data-field="exists" value="1">
+            </div>
+
+            <div class="mt-3 border-top pt-3">
+                <button type="button" class="btn btn-sm btn-outline-danger btnRemoveParte">
+                    <i class="fa-solid fa-trash me-1"></i>Quitar parte
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

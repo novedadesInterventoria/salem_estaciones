@@ -1,0 +1,63 @@
+{
+    "name": "Salem",
+    "version": "1.2.3.4",
+    "manifest_version": 3,
+    "description": "Salem, asistente para ayudar a optimizar la documentación de tickets de OTOBO en SOMI Estaciones.",
+    "content_scripts": [
+        {
+            "matches": [
+                "https://helpdesk.rbsas.co/otobo/*",
+                "https://172.20.0.80/otobo/*",
+                "http://172.20.0.80/otobo/*"
+            ],
+            "js": [
+                "/sources/vendor/js/moment.min.js",
+                "/sources/vendor/js/jquery-3.6.1.min.js",
+                "/sources/vendor/js/sweetalert2@11.js",
+                "/sources/vendor/js/papaparse.min.js",
+                "/sources/api/salem.js"
+            ],
+            "css": [
+                "sources/client/css/salem.css"
+            ]
+        }
+    ],
+    "background": {
+        "service_worker": "/sources/api/background.js"
+    },
+    "icons": {
+        "32": "icons/salem_32x32.png",
+        "48": "icons/salem_48x48.png",
+        "128": "icons/salem_128x128.png",
+        "256": "icons/salem_256x256.png"
+    },
+    "action": {
+        "default_icon": {
+            "32": "icons/salem_32x32.png",
+            "48": "icons/salem_48x48.png",
+            "128": "icons/salem_128x128.png",
+            "256": "icons/salem_256x256.png"
+        }
+    },
+    "permissions": [
+        "storage",
+        "tabs",
+        "contextMenus"
+    ],
+    "host_permissions": [
+        "https://helpdesk.rbsas.co/*",
+        "https://172.20.0.80/*",
+        "http://172.20.0.80/*",
+        "https://sabanatickets-reportes.aws-us-east-1.turso.io/*"
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "*"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ]
+}

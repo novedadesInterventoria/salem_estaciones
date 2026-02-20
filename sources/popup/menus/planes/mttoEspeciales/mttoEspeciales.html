@@ -1,0 +1,66 @@
+<form id="mttoEspeciales">
+  
+    <div class="alert alert-primary" data-tag="createPanel">
+        <div class="row">
+            <small class="text-muted mb-3">Panel de creación de tickets de forma individual</small>
+            <div class="col col-12 mb-3">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-location-arrow"></i>Estación
+                    </span>
+                    <select class="form-select" name="estacion" placeholder="Busque y seleccione" required></select>
+                </div>
+            </div>
+            <div class="col col-12 mb-3">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-hashtag"></i>ID Equipo
+                    </span>
+                    <select class="form-select" name="id" placeholder="Busque y seleccione" required></select>
+                </div>
+            </div>
+            <div class="col col-12 mb-3">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-compass"></i>Costado
+                    </span>
+                    <input type="text" class="form-control" name="costado" tabindex="-1" readonly required>
+                </div>
+            </div>
+            <div class="col col-12 mb-3">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-hard-hat"></i>Tcampo
+                    </span>
+                    <select class="form-select" name="tcampo" required></select>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 mb-3">
+            <label class="form-label">
+                <i class="fas fa-edit"></i> Plantilla del técnico
+            </label>
+            <div data-tag="editorPanel">
+                <div id="editor"></div>
+            </div>
+        </div>
+        
+        <!-- Fila con botón y hora progreso lado a lado -->
+        <div class="row mt-3 align-items-end">
+            <div class="col col-auto">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Generar
+                </button>
+            </div>
+            <div class="col col-auto ms-auto">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-clock"></i>Hora Asignado
+                    </span>
+                    <input type="time" class="form-control" name="hora" required>
+                </div>
+            </div>
+        </div>        
+    </div>
+    <input type="hidden" name="index">
+</form>

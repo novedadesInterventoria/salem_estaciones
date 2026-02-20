@@ -1,0 +1,25 @@
+<form id="downloadMpp">
+    <small class="text-muted d-none" data-tag="planContainer">La consulta de tickets será para el
+        <code data-tag="plan" class="fw-semibold"></code>. <br>¿No es el plan requerido? Sincroniza datos de Salem.
+    </small>
+    <input type="text" name="asunto" readonly class="d-none" required>
+    <div class="row mt-3">
+        <div class="col-xl-6 col-lg-6 col-md-12 mb-3">
+            <div class="input-group">
+                <div class="input-group-text">
+                    <i class="fa-solid fa-filter"></i> Tipo plan
+                </div>
+                <select class="form-select" name="plan" required>
+                    <option value=""></option>
+                    <option value="contractual">PLAN MTTO PREVENTIVO</option>
+                    <option value="contractualTemporales">PLAN MTTO PREVENTIVO ESTACIONES TEMPORALES</option>
+                </select>
+            </div>
+        </div>
+        <div class="col col-auto">
+            <button class="btn btn-primary">
+                <i class="fa-solid fa-download"></i>Descargar
+            </button>
+        </div>
+    </div>
+</form>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salem</title>
+    <link rel="stylesheet" href="sidebar.css">
+</head>
+
+<body>
+    <main class="d-flex flex-nowrap">
+        <div class="flex-shrink-0 p-3 sidebar glass rouded bg-dark" style="width: 210px;">
+            <ul class="list-unstyled ps-0">
+                <li class="mb-1">
+                    <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 collapsed"
+                        data-bs-toggle="collapse" data-bs-target="#monitoreo-collapse" aria-expanded="false"><i
+                            class="fa-solid fa-folder"></i>Gestión Mtto
+                    </button>
+                    <div class="collapse" id="monitoreo-collapse">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                            <li>
+                                <a href="#" data-parent="Planes" data-sidebar-panel="preventivos"
+                                    class="link-dark d-inline-flex text-decoration-none rounded green-button">
+                                    <i class="fa-solid fa-screwdriver-wrench"></i>Preventivos</a>
+                            </li>
+                            <li>
+                                <a href="#" data-parent="Planes" data-sidebar-panel="rutinarios"
+                                    class="link-dark d-inline-flex text-decoration-none rounded red-button">
+                                    <i class="fa-solid fa-gear"></i>Rutinarios</a>
+                            </li>
+
+                            <li>
+                                <a href="#" data-parent="Planes" data-sidebar-panel="mttoEspeciales"
+                                    class="link-dark d-inline-flex text-decoration-none rounded purple-button">
+                                    <i class="fa-brands fa-searchengin"></i>Rutinarios Especiales</a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li class="mb-1">
+                    <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 collapsed"
+                        data-bs-toggle="collapse" data-bs-target="#reports-collapse" aria-expanded="false">
+                        <i class="fa-solid fa-flag"></i>Reportes
+                    </button>
+                    <div class="collapse" id="reports-collapse">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                            <li>
+                                <a href="#" data-parent="Reportes" data-sidebar-panel="updateRutinarios"
+                                    class="link-dark d-inline-flex text-decoration-none rounded">
+                                    <i class="fa-solid fa-folder-plus"></i>Programar Mtto Rutinarios</a>
+                            </li>
+                            <li>
+                                <a href="#" data-parent="Reportes" data-sidebar-panel="updatePreventivos"
+                                    class="link-dark d-inline-flex text-decoration-none rounded">
+                                    <i class="fa-solid fa-folder-plus"></i>Verificar Mtto Preventivos</a>
+                            </li>
+                            <li>
+                                <a href="#" data-parent="Reportes" data-sidebar-panel="updateCheckRutinarios"
+                                    class="link-dark d-inline-flex text-decoration-none rounded">
+                                    <i class="fa-solid fa-folder-plus"></i>Verificar Mtto Rutinarios</a>
+                            </li>
+
+                        </ul>
+                    </div>
+                </li>
+                <li class="mb-1">
+                    <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 collapsed"
+                        data-bs-toggle="collapse" data-bs-target="#utils-collapse" aria-expanded="false">
+                        <i class="fa-solid fa-toolbox"></i>Utilidades
+                    </button>
+                    <div class="collapse" id="utils-collapse">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                            <li>
+                                <a href="#" data-parent="Utilidades" data-sidebar-panel="bulk"
+                                    class="link-dark d-inline-flex text-decoration-none rounded">
+                                    <i class="fa-solid fa-link"></i>Bulk</a>
+                            </li>
+                            <li>
+                                <a href="https://script.google.com/a/macros/rbsas.co/s/AKfycbxMr1ls_nxMLBwiSX8Pdj4_aZYgqa_ZbjA4SQVZcmAZHaNxq9etTU09JuydUGoPcYJSQQ/exec"
+                                    target="_self" class="link-dark d-inline-flex text-decoration-none rounded">
+                                    <i class="fa-solid fa-check"></i>Freya</a>
+                            </li>
+                            <li>
+                                <a href="#" data-parent="Utilidades" data-sidebar-panel="sweep"
+                                    class="link-dark d-inline-flex text-decoration-none rounded">
+                                    <i class="fa-solid fa-broom"></i>Trazas</a>
+                            </li>
+                            <li>
+                                <a href="#" data-parent="Utilidades" data-sidebar-panel="close"
+                                    class="link-dark d-inline-flex text-decoration-none rounded">
+                                    <i class="fa-solid fa-times-circle"></i>Cierres</a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li class="border-top my-3"></li>
+                <li class="mb-1">
+                    <button class="btn btn-toggle d-inline-flex align-items-center rounded border-0 collapsed"
+                        data-bs-toggle="collapse" data-bs-target="#admin-collapse" aria-expanded="false">
+                        <i class="fa-solid fa-user-gear"></i>Administrar
+                    </button>
+                    <div class="collapse" id="admin-collapse">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                            <li>
+                                <a href="#" data-parent="Adminitrar" data-sidebar-panel="preferences"
+                                    class="link-dark d-inline-flex text-decoration-none rounded"><i
+                                        class="fa-solid fa-cog"></i>Preferencias</a>
+                            </li>
+                            <li>
+                                <a href="#" data-parent="Adminitrar" data-sidebar-panel="sync"
+                                    class="link-dark d-inline-flex text-decoration-none rounded"><i
+                                        class="fa-solid fa-rotate"></i>Sincronizar</a>
+                            </li>
+                            <li>
+                                <a href="#" data-parent="Adminitrar" data-sidebar-panel="about"
+                                    class="link-dark d-inline-flex text-decoration-none rounded"><i
+                                        class="fa-solid fa-info-circle"></i>Acerca de</a>
+                            </li>
+                            <li>
+                                <a href="#" data-parent="Adminitrar" data-sidebar-panel="killSession"
+                                    class="link-dark d-inline-flex text-decoration-none rounded"><i
+                                        class="fa-solid fa-times-circle"></i>Cerrar sesión</a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        <div class="d-block sidebar-container px-3 py-2">
+            <div class="row">
+                <div class="col col-lg-auto col-1 my-auto">
+                    <a href="#" class="link-dark" data-tag="salemSidebarToggle"><i
+                            class="fa-solid fa-bars fa-2x"></i></a>
+                </div>
+                <div class="col col-lg-7 col-6">
+                    <div class="lh-1">
+                        <span class="m-0 fw-bold fs-4 text-wrap" data-sidebar="title"></span><br>
+                        <span class="m-0 text-wrap" data-sidebar="message"></span>
+                    </div>
+                </div>
+                <div class="col col-4 col-lg-4 d-flex ms-auto">
+                    <div class="lh-1 ms-auto my-auto me-1 text-end ">
+                        <span data-tag="username" class="fw-semibold"></span><br>
+                        <span data-tag="cargo"></span>
+                    </div>
+                    <img src="/icons/salem_48x48.png" class="my-auto rounded-circle p-1" data-tag="gravatar"
+                        width="48px" height="48px">
+                </div>
+            </div>
+            <div data-tag="sidebar-content" class="mt-3"></div>
+        </div>
+    </main>
+
+
+    <!-- Vendor scripts -->
+    <script src="/sources/vendor/js/jquery-3.6.1.min.js"></script>
+    <script src="/sources/vendor/js/chart.min.js"></script>
+    <script src="/sources/vendor/js/bootstrap.bundle.min.js"></script>
+    <script src="/sources/vendor/js/moment.min.js"></script>
+    <script src="/sources/vendor/js/tom-select.complete.min.js"></script>
+    <script src="/sources/vendor/js/papaparse.min.js"></script>
+    <script src="/sources/vendor/js/notify.js"></script>
+    <script src="/sources/vendor/js/crypto-js.min.js"></script>
+    <script src="/sources/vendor/js/sweetalert2@11.js"></script>
+    <script src="/sources/vendor/js/ckeditor.js"></script>
+    <script src="/sources/vendor/js/xlsx.full.min.js"></script>
+    <!-- ExcelJS: Librería moderna con soporte completo de estilos -->
+    <script src="/sources/vendor/js/exceljs.min.js"></script>
+
+    <!-- Salem Module Script -->
+    <script src="/sources/api/salem.js"></script>
+    <script src="sidebar.js"></script>
+</body>
+
+</html>

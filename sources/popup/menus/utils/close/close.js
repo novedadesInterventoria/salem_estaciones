@@ -21,7 +21,56 @@
     $form.find('[name="rotulo"]').val(info.rotulo || '');
     $form.find('[name="equipo"]').val(idEquipo);
     $form.find('[name="ubicacion"]').val(ubicacion);
-    $form.find('[name="tcampo"]').val(info['¿Quién Gestiona?'] || '');
+    // [FIX P1] Inicializar selector TomSelect de técnicos reutilizando SalemTecnicos
+    // El técnico original se fija vía onReady para garantizar que TomSelect ya esté listo.
+    const _tecnicoOriginal = String(info['¿Quién Gestiona?'] || '').replace(/\D/g, '').trim();
+    (function inicializarSelectorTecnico() {
+        const $selectTcampo = $form.find('[name="tcampo"]');
+        if (!$selectTcampo.length) return;
+
+        // Si el técnico original existe, pre-cargar una opción inicial para que TomSelect
+        // no arranque vacío y la selección no se pierda durante la carga asíncrona.
+        // Enriquecer etiqueta con CÉDULA - NOMBRE si ya está en caché local de técnicos.
+        if (_tecnicoOriginal) {
+            const tecnicoObj = (typeof SalemTecnicos !== 'undefined' && typeof SalemTecnicos.getTecnicos === 'function')
+                ? SalemTecnicos.getTecnicos().find(t => t.value === _tecnicoOriginal)
+                : null;
+            const textoTecnico = tecnicoObj && tecnicoObj.name ? tecnicoObj.name : _tecnicoOriginal;
+
+            $selectTcampo.append(
+                $('<option>', { value: _tecnicoOriginal, text: textoTecnico, selected: true })
+            );
+        }
+
+        SalemTecnicos.init($form, function (ts) {
+            // onReady: TomSelect ya está montado. Fijar el técnico original si no fue
+            // cambiado por el usuario (el valor actual sigue siendo el pre-cargado o vacío).
+            const valorActual = ts.getValue();
+            const tecnicoObj = (typeof SalemTecnicos !== 'undefined' && typeof SalemTecnicos.getTecnicos === 'function')
+                ? SalemTecnicos.getTecnicos().find(t => t.value === _tecnicoOriginal)
+                : null;
+            const textoTecnico = tecnicoObj && tecnicoObj.name ? tecnicoObj.name : _tecnicoOriginal;
+
+            if (!valorActual && _tecnicoOriginal) {
+                // La opción inicial puede no existir todavía en las opciones de TomSelect;
+                // agregarla si falta antes de seleccionarla.
+                if (!ts.options[_tecnicoOriginal]) {
+                    ts.addOption({ value: _tecnicoOriginal, name: textoTecnico });
+                }
+                ts.setValue(_tecnicoOriginal, /* silent= */ true);
+            } else if (valorActual === _tecnicoOriginal || !valorActual) {
+                // Mismo valor pre-cargado → confirmar selección silenciosa.
+                if (_tecnicoOriginal) {
+                    if (!ts.options[_tecnicoOriginal]) {
+                        ts.addOption({ value: _tecnicoOriginal, name: textoTecnico });
+                    }
+                    ts.setValue(_tecnicoOriginal, /* silent= */ true);
+                }
+            }
+            // Si el usuario ya cambió el valor (valorActual !== _tecnicoOriginal && valorActual),
+            // no se sobreescribe: se conserva la selección activa.
+        });
+    })();
     $form.find('[name="falla"]').val(falla);
 
     // [REQ 1] Autorrellenado de hora de cierre con hora actual del PC (HH:MM), 100% editable
@@ -106,82 +155,351 @@
     const $btnAddParte = $('#btnAddParte');
     const $listaPartes = $('#listaPartes');
     let partesOptionsCache = null;
+    // Control de concurrencia y generación para evitar carreras asíncronas y respuestas tardías
+    let _partesRequestSeq = 0;
+    let _partesLoadingPromise = null;
 
     /**
-     * @description Carga y cachea las opciones del campo dinámico de partes (DynamicField_PARTESNOBUSES)
-     * desde el formulario de cierre de OTOBO (AgentTicketClose). Intenta parseo vía DOM primero y
-     * recurre al formulario JSON como alternativa. Deduplica las opciones y las inserta en el `$select` recibido.
+     * @description Carga y cachea las opciones reales del campo DynamicField_PARTESNOBUSES
+     * desde OTOBO mediante petición directa a AgentTicketClose con transform: 'plain'.
+     * Protegido contra respuestas tardías mediante Request ID / Secuencia monotónica.
      *
-     * @param {jQuery} $select - Elemento `<select>` de jQuery donde se cargarán las opciones de partes.
-     *
+     * @param {jQuery} $select - Elemento <select> donde se insertarán las opciones.
      * @returns {Promise<void>}
      */
     const cargarOpcionesParte = async ($select) => {
+        // Si ya hay caché válida, poblar directamente sin nueva petición.
+        if (partesOptionsCache && partesOptionsCache.length > 0) {
+            _poblarSelect($select, partesOptionsCache);
+            return;
+        }
+
+        // Si hay una carga en vuelo, compartir la promesa activa sin duplicar llamadas.
+        if (_partesLoadingPromise) {
+            try {
+                await _partesLoadingPromise;
+                if (partesOptionsCache && partesOptionsCache.length > 0) {
+                    _poblarSelect($select, partesOptionsCache);
+                }
+            } catch (_) {
+                // El error de la solicitud en curso se gestiona en su propio flujo
+            }
+            return;
+        }
+
+        const myPromise = _cargarOpcionesDesdeOTOBO();
+        _partesLoadingPromise = myPromise;
+
         try {
-            if (!partesOptionsCache || partesOptionsCache.length === 0) {
-                partesOptionsCache = [];
-                
-                // Carga optimizada y unificada desde OTOBO (DOM con fallback a Form)
-                try {
-                    const dom = await Salem.otrs.ajax({ 
-                        Action: 'AgentTicketClose', 
-                        TicketID: info.id, 
-                        transform: 'dom' 
-                    });
-                    const $dom = $(dom);
-                    const $options = $dom.find('#DynamicField_PARTESNOBUSES1 option, #DynamicField_PARTESNOBUSES option');
-                    
-                    $options.each(function () {
-                        const value = $(this).attr('value') || '';
-                        const text = $(this).text().trim();
-                        if (value && value !== '-') {
-                            partesOptionsCache.push({ value, text });
-                        }
-                    });
-                } catch (domErr) {
-                    console.warn('[SALEM][CLOSE] Fallback a form para opciones de parte:', domErr);
-                    const formData = await Salem.otrs.ajax({ 
-                        Action: 'AgentTicketClose', 
-                        TicketID: info.id, 
-                        transform: 'form' 
-                    });
-                    
-                    if (formData) {
-                        Object.keys(formData).forEach(key => {
-                            if (/^DynamicField_PARTESNOBUSES\d*\.Option$/.test(key)) {
-                                const options = formData[key];
-                                Object.entries(options).forEach(([value, text]) => {
-                                    if (value && value !== '-') {
-                                        partesOptionsCache.push({ value, text });
-                                    }
-                                });
-                            }
-                        });
+            const opciones = await myPromise;
+            if (opciones && opciones.length > 0) {
+                partesOptionsCache = opciones;
+                _poblarSelect($select, partesOptionsCache);
+            }
+        } catch (err) {
+            console.error('[SALEM][CLOSE] Error en cargarOpcionesParte:', err);
+            const userMsg = err && err.message ? err.message : 'Error al cargar opciones';
+            _mostrarErrorSelect($select, userMsg);
+        } finally {
+            if (_partesLoadingPromise === myPromise) {
+                _partesLoadingPromise = null;
+            }
+        }
+    };
+
+    /**
+     * Inicializa o reinicializa TomSelect con búsqueda en un <select> de parte.
+     * Si ya existe una instancia TomSelect en ese elemento, la destruye primero.
+     */
+    function _inicializarTomSelectParte($select) {
+        const el = $select[0];
+        if (!el) return;
+        // Destruir instancia previa si existe
+        if (el.tomselect) {
+            try { el.tomselect.destroy(); } catch (_) {}
+        }
+        try {
+            new TomSelect(el, {
+                placeholder: 'Buscar parte...',
+                plugins: ['dropdown_input'],
+                maxOptions: null,
+                searchField: ['text'],
+                sortField: [{ field: 'text', direction: 'asc' }],
+                render: {
+                    no_results: function () {
+                        return '<div class="no-results">Sin resultados</div>';
                     }
                 }
+            });
+        } catch (e) {
+            console.warn('[SALEM][CLOSE] TomSelect parte no disponible, usando select nativo.', e);
+        }
+    }
 
-                // Deduplicar opciones
+    /** Puebla un <select> con las opciones cacheadas e inicializa TomSelect con buscador. */
+    function _poblarSelect($select, opciones) {
+        // Destruir TomSelect previo antes de modificar el <select> nativo
+        const el = $select[0];
+        if (el && el.tomselect) {
+            try { el.tomselect.destroy(); } catch (_) {}
+        }
+        $select.empty();
+        if (!opciones || opciones.length === 0) {
+            _mostrarErrorSelect($select, 'No se encontraron partes disponibles');
+            return;
+        }
+        $select.append($('<option>', { value: '', text: 'Seleccione una parte', disabled: true, selected: true }));
+        opciones.forEach(opt => {
+            $select.append($('<option>', { value: opt.value, text: opt.text }));
+        });
+        // Montar TomSelect con búsqueda sobre el select ya poblado
+        _inicializarTomSelectParte($select);
+    }
+
+    /** Muestra un mensaje informativo o de error en el <select>. */
+    function _mostrarErrorSelect($select, msg) {
+        const el = $select[0];
+        if (el && el.tomselect) {
+            try { el.tomselect.destroy(); } catch (_) {}
+        }
+        $select.empty();
+        $select.append($('<option>', { value: '', text: msg, disabled: true, selected: true }));
+    }
+
+    /**
+     * Envuelve una promesa con un timeout de seguridad y cancela el timer con clearTimeout
+     * para evitar temporizadores pendientes innecesarios en el event loop.
+     * @param {Promise} promise
+     * @param {number} ms
+     * @param {string} label
+     * @returns {Promise}
+     */
+    function _promesaConTimeout(promise, ms, label) {
+        let timer = null;
+        const timeoutPromise = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+                reject(new Error(`Tiempo de espera agotado (${label})`));
+            }, ms);
+        });
+
+        return Promise.race([
+            Promise.resolve(promise),
+            timeoutPromise
+        ]).finally(() => {
+            if (timer) clearTimeout(timer);
+        });
+    }
+
+    /**
+     * Interpreta la respuesta sin procesar de OTOBO (HTML o JSON de compatibilidad):
+     * - HTML: Parseo vía DOMParser buscando selects de PARTESNOBUSES, descartando vacíos y '-'.
+     *   Detecta errores solo en contenedores visibles (.Error, .ErrorMessage, .MessageBox.Error).
+     *   Detecta login solo en inputs de login o título.
+     *   NO contiene ninguna regla de challenge token que genere falsos positivos.
+     * - JSON: Soporta tuplas [val, text, ...] u objetos { val: text }.
+     *
+     * @param {string|object} rawResponse
+     * @returns {{ opciones: Array<{value:string, text:string}>, errorMsg: string|null }}
+     */
+    function _interpretarRespuestaOTOBO(rawResponse) {
+        if (!rawResponse) {
+            return { opciones: [], errorMsg: 'Respuesta vacía del servidor OTOBO.' };
+        }
+
+        let opciones = [];
+
+        // ── 1. Bloque JSON de compatibilidad (solo si inicia con { o [ o es un objeto) ──
+        let parsedJson = null;
+        if (typeof rawResponse === 'object' && rawResponse !== null) {
+            parsedJson = rawResponse;
+        } else if (typeof rawResponse === 'string') {
+            const trimmed = rawResponse.trim();
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                try {
+                    parsedJson = JSON.parse(trimmed);
+                } catch (_) {
+                    // No es JSON válido; continuará al análisis HTML
+                }
+            }
+        }
+
+        if (parsedJson) {
+            let targetData = null;
+            if (Array.isArray(parsedJson)) {
+                const found = parsedJson.find(it => it && typeof it === 'object' && (
+                    it.Name === 'DynamicField_PARTESNOBUSES' ||
+                    /^DynamicField_PARTESNOBUSES\d*$/i.test(it.Name || it.name || '')
+                ));
+                if (found && found.Data) {
+                    targetData = found.Data;
+                }
+            } else if (typeof parsedJson === 'object') {
+                const targetKey = Object.keys(parsedJson).find(k =>
+                    k === 'DynamicField_PARTESNOBUSES' ||
+                    /^DynamicField_PARTESNOBUSES\d*$/i.test(k)
+                );
+                if (targetKey) {
+                    targetData = parsedJson[targetKey];
+                }
+            }
+
+            if (targetData) {
+                if (Array.isArray(targetData)) {
+                    targetData.forEach(entry => {
+                        let val = '';
+                        let txt = '';
+                        if (Array.isArray(entry)) {
+                            val = entry[0] !== undefined && entry[0] !== null ? String(entry[0]).trim() : '';
+                            txt = entry[1] !== undefined && entry[1] !== null ? String(entry[1]).trim() : val;
+                        } else if (entry && typeof entry === 'object') {
+                            val = String(entry.value || entry.Key || entry.Name || entry.val || '').trim();
+                            txt = String(entry.text || entry.Value || entry.Data || entry.txt || val).trim();
+                        }
+                        if (val && val !== '-' && val !== '' && txt && txt !== '-') {
+                            opciones.push({ value: val, text: txt });
+                        }
+                    });
+                } else if (typeof targetData === 'object' && targetData !== null) {
+                    Object.entries(targetData).forEach(([k, v]) => {
+                        const val = String(k || '').trim();
+                        let txt = '';
+                        if (typeof v === 'string' || typeof v === 'number') {
+                            txt = String(v).trim();
+                        } else if (Array.isArray(v)) {
+                            txt = String(v[1] || v[0] || val).trim();
+                        } else if (v && typeof v === 'object') {
+                            txt = String(v.text || v.Value || v.Data || val).trim();
+                        } else {
+                            txt = val;
+                        }
+
+                        if (val && val !== '-' && val !== '' && txt && txt !== '-') {
+                            opciones.push({ value: val, text: txt });
+                        }
+                    });
+                }
+            }
+
+            if (opciones.length > 0) {
                 const seen = new Set();
-                partesOptionsCache = partesOptionsCache.filter(opt => {
+                opciones = opciones.filter(opt => {
                     if (seen.has(opt.value)) return false;
                     seen.add(opt.value);
                     return true;
                 });
+                return { opciones, errorMsg: null };
+            }
+        }
+
+        // ── 2. Análisis HTML vía DOMParser (Flujo nativo de OTOBO) ─────────────
+        if (typeof rawResponse === 'string') {
+            let doc = null;
+            if (typeof DOMParser !== 'undefined') {
+                try {
+                    doc = new DOMParser().parseFromString(rawResponse, 'text/html');
+                } catch (pErr) {
+                    console.warn('[SALEM][CLOSE] DOMParser error:', pErr);
+                }
             }
 
-            // Poblar el select
-            $select.empty();
-            $select.append('<option value="" disabled selected>Seleccione una parte</option>');
-            partesOptionsCache.forEach(opt => {
-                $select.append(`<option value="${opt.value}">${opt.text}</option>`);
-            });
+            if (doc) {
+                // Detección controlada de sesión expirada / login
+                const isLoginPage = doc.querySelector('input[name="User"], input[name="Password"], #LoginBox') !== null ||
+                                    /iniciar sesión|login/i.test(doc.title || '');
+                if (isLoginPage) {
+                    return { opciones: [], errorMsg: 'Sesión expirada en OTOBO. Recargue la pestaña.' };
+                }
 
-        } catch (error) {
-            console.error('[SALEM][CLOSE] Error al cargar opciones de partes:', error);
-            $select.empty();
-            $select.append('<option value="" disabled selected>Error al cargar opciones</option>');
+                // Detección de error REAL ÚNICAMENTE en contenedores visibles de error de OTOBO
+                const errorBox = doc.querySelector('.Error, .ErrorMessage, .MessageBox.Error');
+                if (errorBox) {
+                    const errTxt = (errorBox.textContent || '').trim();
+                    if (errTxt) {
+                        return { opciones: [], errorMsg: errTxt };
+                    }
+                }
+
+                // Extracción de opciones del selector de partes
+                const selects = doc.querySelectorAll(
+                    'select#DynamicField_PARTESNOBUSES1, select#DynamicField_PARTESNOBUSES, select[id^="DynamicField_PARTESNOBUSES"], select[name^="DynamicField_PARTESNOBUSES"]'
+                );
+
+                if (selects && selects.length > 0) {
+                    selects.forEach(selectPartes => {
+                        const optElements = selectPartes.querySelectorAll('option');
+                        optElements.forEach(opt => {
+                            const val = (opt.getAttribute('value') || '').trim();
+                            const txt = (opt.textContent || '').trim();
+                            if (val && val !== '-' && val !== '' && txt && txt !== '-') {
+                                opciones.push({ value: val, text: txt || val });
+                            }
+                        });
+                    });
+
+                    if (opciones.length > 0) {
+                        const seen = new Set();
+                        opciones = opciones.filter(opt => {
+                            if (seen.has(opt.value)) return false;
+                            seen.add(opt.value);
+                            return true;
+                        });
+                        return { opciones, errorMsg: null };
+                    }
+                }
+            }
         }
-    };
+
+        return { opciones: [], errorMsg: 'Ninguna fuente devolvió opciones para PARTESNOBUSES.' };
+    }
+
+    /**
+     * Realiza la consulta directa a OTOBO (AgentTicketClose) en texto plano (transform: 'plain')
+     * e interpreta la respuesta (HTML o JSON de respaldo).
+     * Controlado por seq monotónico para ignorar respuestas tardías u obsoletas.
+     *
+     * @returns {Promise<Array<{value:string, text:string}>>}
+     */
+    async function _cargarOpcionesDesdeOTOBO() {
+        const reqId = ++_partesRequestSeq;
+
+        let rawResponse = null;
+        try {
+            rawResponse = await _promesaConTimeout(
+                Salem.otrs.ajax({
+                    Action: 'AgentTicketClose',
+                    TicketID: info.id,
+                    transform: 'plain'
+                }),
+                8000,
+                'AgentTicketClose'
+            );
+        } catch (ajaxErr) {
+            console.warn('[SALEM][CLOSE] Petición AgentTicketClose falló o timeout:', ajaxErr);
+            throw ajaxErr;
+        }
+
+        // Verificar secuencia antes de procesar o guardar
+        if (reqId !== _partesRequestSeq) {
+            return [];
+        }
+
+        const resultado = _interpretarRespuestaOTOBO(rawResponse);
+        const opciones = resultado.opciones || [];
+
+        // Verificar nuevamente la secuencia antes de retornar
+        if (reqId !== _partesRequestSeq) {
+            return [];
+        }
+
+        if (opciones.length > 0) {
+            console.info(`[SALEM][CLOSE] Catálogo de partes cargado exitosamente (seq ${reqId}): ${opciones.length} opciones.`);
+            return opciones;
+        } else {
+            const msg = resultado.errorMsg || 'Ninguna fuente devolvió opciones para PARTESNOBUSES.';
+            console.error('[SALEM][CLOSE]', msg);
+            throw new Error(msg);
+        }
+    }
 
     if (includesCambioParte) {
         $(document).on('change', 'select[name="parte"]', async function () {
@@ -199,34 +517,41 @@
             }
         });
 
+        // [FIX P2-B] Contador global de partes. Se incrementa siempre hacia adelante
+        // para garantizar data-uid únicos aunque se eliminen elementos intermedios.
+        let _parteUidCounter = 0;
+
         /**
-         * @description Clona la plantilla HTML de parte, asigna nombres de campo dinámicos indexados
-         * (`DynamicField_PARTESNOBUSESn`, `DynamicField_SERIALINSTALADOn`, etc.),
-         * la añade con animación fadeIn a la lista de partes y carga sus opciones desde OTOBO.
+         * @description Clona la plantilla HTML de parte, asigna un data-uid único e irrepetible
+         * (independiente de la posición DOM), la añade con animación fadeIn y carga sus opciones.
+         * Los nombres de campo OTOBO se normalizan justo antes del envío, NO aquí.
          *
          * @returns {Promise<void>}
          */
         const agregarNuevaParte = async () => {
-            const cantidadPartes = $listaPartes.children('.parte-item').length;
-            const nuevoIndex = cantidadPartes + 1;
-            
+            _parteUidCounter++;
+            const uid = _parteUidCounter;
+
             const $template = $('#parteTemplate');
             const $nuevaParte = $template.clone();
-            
+
             $nuevaParte.attr('id', '');
             $nuevaParte.addClass('parte-item');
-            $nuevaParte.attr('data-index', nuevoIndex);
+            // data-uid: identificador permanente; data-index se asignará en el payload.
+            $nuevaParte.attr('data-uid', uid);
             $nuevaParte.removeClass('d-none');
-            
-            $nuevaParte.find('[data-field="parte"]').attr('name', `DynamicField_PARTESNOBUSES${nuevoIndex}`);
-            $nuevaParte.find('[data-field="serial-instalado"]').attr('name', `DynamicField_SERIALINSTALADO${nuevoIndex}`);
-            $nuevaParte.find('[data-field="serial-retirado"]').attr('name', `DynamicField_SERIALRETIRADO${nuevoIndex}`);
-            $nuevaParte.find('[data-field="exists"]').attr('name', `ExistsDynamicField_PARTESNOBUSES${nuevoIndex}`);
-            
+
+            // Usar nombres temporales con el uid para que jQuery pueda encontrar los
+            // campos dentro de ESTE elemento sin colisionar con otros.
+            $nuevaParte.find('[data-field="parte"]').attr('name', `_parte_uid_${uid}`);
+            $nuevaParte.find('[data-field="serial-instalado"]').attr('name', `_serialin_uid_${uid}`);
+            $nuevaParte.find('[data-field="serial-retirado"]').attr('name', `_serialout_uid_${uid}`);
+            $nuevaParte.find('[data-field="exists"]').attr('name', `_exists_uid_${uid}`);
+
             $nuevaParte.hide();
             $listaPartes.append($nuevaParte);
             $nuevaParte.fadeIn(300);
-            
+
             await cargarOpcionesParte($nuevaParte.find('[data-field="parte"]'));
         };
 
@@ -234,7 +559,12 @@
 
         $(document).on('click', '.btnRemoveParte', function () {
             const $item = $(this).closest('.parte-item');
-            $item.fadeOut(300, function() {
+            // Destruir instancia TomSelect antes de remover el elemento del DOM
+            const selectEl = $item.find('[data-field="parte"]')[0];
+            if (selectEl && selectEl.tomselect) {
+                try { selectEl.tomselect.destroy(); } catch (_) {}
+            }
+            $item.removeClass('parte-item').fadeOut(300, function () {
                 $(this).remove();
             });
         });
@@ -350,13 +680,22 @@
         // Construir campos de partes
         const original = {};
         if (includesCambioParte && data.parte === 'SI') {
-            $listaPartes.find('.parte-item').each(function (idx) {
-                const index = idx + 1;
-                const parte = $(this).find(`[name="DynamicField_PARTESNOBUSES${index}"]`).val();
-                const serialIn = $(this).find(`[name="DynamicField_SERIALINSTALADO${index}"]`).val();
-                const serialOut = $(this).find(`[name="DynamicField_SERIALRETIRADO${index}"]`).val();
-                
+            // [FIX P2-B] Construir payload de partes con índices CONSECUTIVOS normalizados.
+            // Se leen los valores usando data-field (no por nombre indexado), lo que garantiza
+            // que eliminar una parte intermedia no rompa la lectura de las restantes.
+            // La renumeración 1,2,3... se hace aquí, justo antes de construir el objeto,
+            // para cumplir con el requisito de OTOBO de índices contiguos.
+            const parteItems = $listaPartes.find('.parte-item').toArray();
+            let consecutiveIndex = 0;
+            parteItems.forEach(function (el) {
+                const $el = $(el);
+                const parte = $el.find('[data-field="parte"]').val();
+                const serialIn = $el.find('[data-field="serial-instalado"]').val();
+                const serialOut = $el.find('[data-field="serial-retirado"]').val();
+
                 if (parte) {
+                    consecutiveIndex++;
+                    const index = consecutiveIndex;
                     original[`ExistsDynamicField_PARTESNOBUSES${index}`] = '1';
                     original[`DynamicField_PARTESNOBUSES${index}`] = parte;
                     if (serialIn) original[`DynamicField_SERIALINSTALADO${index}`] = serialIn;

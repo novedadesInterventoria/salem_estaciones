@@ -1658,25 +1658,27 @@
               })();
 
               campos.id = (() => {
-                // 1. Buscar en CUALQUIER enlace de la página que tenga TicketID=
-                let allLinks = req && req.dom
-                  ? req.dom.find("a[href*='TicketID=']")
-                  : $("a[href*='TicketID=']");
-                for (let el of allLinks) {
+                // 1. TicketID en la URL actual (prioridad máxima: es el ticket que el agente está viendo)
+                let urlMatch = window.location.href.match(/[?;&]TicketID=(\d+)/i);
+                if (urlMatch) return urlMatch[1];
+
+                // 2. Input oculto TicketID en formularios del ticket
+                let ticketIdInput = req && req.dom
+                  ? req.dom.find('input[name="TicketID"]').val()
+                  : $('input[name="TicketID"]').val();
+                if (ticketIdInput && /^\d+$/.test(ticketIdInput.trim())) {
+                  return ticketIdInput.trim();
+                }
+
+                // 3. Enlaces de acción propios del ticket (.AsPopup, método original V1.2.3.4)
+                let popupLinks = req && req.dom
+                  ? req.dom.find(".AsPopup[href*='TicketID=']")
+                  : $(".AsPopup[href*='TicketID=']");
+                for (let el of popupLinks) {
                   let href = $(el).attr("href") || "";
                   let match = href.match(/[?;&]TicketID=(\d+)/i);
                   if (match) return match[1];
                 }
-
-                // 2. Input oculto en formularios
-                let ticketIdInput = req && req.dom
-                  ? req.dom.find('input[name="TicketID"]').val()
-                  : $('input[name="TicketID"]').val();
-                if (ticketIdInput) return ticketIdInput.trim();
-
-                // 3. TicketID en la URL actual
-                let urlMatch = window.location.href.match(/[?;&]TicketID=(\d+)/i);
-                if (urlMatch) return urlMatch[1];
 
                 // 4. OTOBO Core.Config (variable JS global de OTOBO)
                 try {
@@ -1686,7 +1688,7 @@
                   }
                 } catch (e) {}
 
-                // 5. Buscar en scripts inline de la página (OTOBO a veces inyecta TicketID en JS)
+                // 5. Buscar en scripts inline de la página
                 try {
                   let scripts = document.querySelectorAll("script:not([src])");
                   for (let s of scripts) {
